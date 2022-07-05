@@ -10,4 +10,5 @@ Edition 4 --- (1) Main part
 (2) Sensor part:    
 1x K96 Sensor                   
 Note: The diameter of drill hole of Edition 2 and Edition 3 is too small, Edition 4's drill hole's diameter is 1.5 times of original diameter      
+
 ----------------------------------------------------------------------------
