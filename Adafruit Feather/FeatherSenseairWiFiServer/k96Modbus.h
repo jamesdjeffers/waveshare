@@ -1,4 +1,9 @@
 /* k96Modbus.h - Library for serial data transfer to Senseair K96 NDIR
+  
+  Senseair K96 sensors use modbus protocol to transfer data over serial.
+  Each command is 7 bytes that request a memory transfer of a given number of bytes.
+  The 
+  
   Copyright (c) 2022 University of Oklahoma.  All right reserved.
 
   This library is free software; you can redistribute it and/or
@@ -20,36 +25,43 @@
 #ifndef k96Modbus_h
 #define k96Modbus_h
 
+#define K96_BAUD      115200
+#define K96_TIMEOUT   200
+
+#define K96_POWER     A0
+
 #include <Arduino.h>
 
 class k96Modbus
 {
 private:
     
-    char command[63] = {0x68,0x44,0x00,0x00,0x02,0xD0,0xF8,
-                       0x68,0x44,0x00,0x02,0x02,0xD1,0x98,
-                       0x68,0x44,0x00,0x04,0x02,0xD2,0x38,
-                       0x68,0x44,0x00,0x06,0x02,0xD3,0x58,
-                       0x68,0x44,0x00,0x08,0x02,0xD7,0x38,
-                       0x68,0x44,0x00,0x0A,0x02,0xD6,0x58,
-                       0x68,0x44,0x00,0x0E,0x02,0xD4,0x98,
-                       0x68,0x44,0x00,0x10,0x02,0xDD,0x38,
-                       0x68,0x44,0x00,0x12,0x02,0xDC,0x58};
+    char command[49] = {0x68,0x44,0x00,0x00,0x0E,0xD0,0xFD,
+                        0x68,0x44,0x00,0x1C,0x02,0xD8,0x38,
+                        0x68,0x44,0x03,0x64,0x04,0x8A,0x3A,
+                        0x68,0x44,0x01,0x84,0x04,0x62,0x3A,
+                        0x68,0x44,0x01,0x94,0x04,0x6F,0xFA,                      
+                        0x68,0x44,0x03,0xA4,0x02,0x5A,0x38};
       
     String labels[9] = {"<br>CH4: ","<br>CO2: ","<br>H2O: ","<br>Pressure: ","<br>T0: ",
                         "<br>T1: ", "<br>T2: ", "<br>Humidity: ", "<br>T3: "};
       
     int k96_memory[9] = {1,1,1,1,1,1,1,1,1};
-    int byteConvert(byte high, byte low);
+    long k96MemoryLong[3] = {1,1,1};
+    int wordConvert(byte high, byte low);
+    long longConvert(byte highest, byte higher, byte lower, byte lowest);
  
 public:
     k96Modbus();
     
     
     void init();
-    int readResponse();    
+    int readResponse();
+    long readResponseLong(); 
+    int readResponse(int numBytes);    
     void writeCommand(int byteAddress);
-    String readCSVString();    
+    String readCSVString();
+    String readCSVString2();    
     String readByteString(int byteAddress);
 };
 

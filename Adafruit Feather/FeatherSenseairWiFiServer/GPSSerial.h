@@ -20,11 +20,13 @@
 #ifndef GPSSerial_h
 #define GPSSerial_h
 
-#define GPS_RX        21
-#define GPS_TX        20
+#define GPS_RX        5
+#define GPS_TX        2
 #define GPS_BAUD      9600
-#define GPS_TIMEOUT   200
+#define GPS_TIMEOUT   100
 
+#include <Arduino.h>        // required before wiring_private.h
+#include "wiring_private.h" // pinPeripheral() function
 // The TinyGPS++ object
 #include <TinyGPS++.h>
 
@@ -36,7 +38,7 @@ class GPSSerial
 
   public:
     GPSSerial();
-    void init();
+    int init();
     String readResponse();
     
     float lng();

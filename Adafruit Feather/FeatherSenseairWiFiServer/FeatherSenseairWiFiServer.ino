@@ -1,7 +1,7 @@
 /* Adafruit Feather Senseair K96 with Modbus Interface
 
   Written by James D. Jeffers 2022/06/30
-  Copyright (c) 2022 Jeffers Emerging Technologies, LLC.  All right reserved.
+  Copyright (c) 2022 University of Oklahoma.  All right reserved.
 
   This library is free software; you can redistribute it and/or
   modify it under the terms of the GNU Lesser General Public
@@ -20,26 +20,43 @@
 
 #include "k96Modbus.h"
 #include "Airlift.h"
-#include "ClockTime.h"
 #include "SimModem.h"
-#include "GPSSerial.h"
 #include "DataLogger.h"
+#include "GPSSerial.h"
+
+#include <TinyGPS++.h>
+
+#include <NTPClient.h>
+#include <WiFiUdp.h>
 
 String dataString = "";
 
-int LoopDelay = 5000;
+int LoopDelay = 30000;
 int LastRead = 0;
+int fileDelay = 900000;
+int LastFileUpload = 0;
+int updateDelay = 180000;
+int LastDataUpload = 0;
 
 SimModem modem;
+int modemStatus = -1;
 k96Modbus k96;
-GPSSerial gps;
-bool GPSEnabled = false;
+int GPSStatus = -1;
 DataLogger logger;
 int SDStatus = -1;
+GPSSerial gpsSerial;
+
+// GPS string conversion object
+TinyGPSPlus gps;
+
+// Time stamp updates
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP,"pool.ntp.org", 36000, 60000);
+bool NTPEnabled = false;
 
 void setup() {
   //Initialize serial and wait for port to open:
-  Serial.begin(9600);
+  Serial.begin(115200);
   Serial.println("Access Point Web Server");
 
   // print the network name (SSID);
@@ -54,24 +71,30 @@ void setup() {
 
   // you're connected now, so print out the status
   printWifiStatus();
-  Clock_init();
   
   /* Initialise the sensor */
   k96.init();
-  gps.init();
   
-  // Device 3: Modem
-  // Can provide internet access and GPS
-  Serial.print("Initializing Simcom 7070G Modem...");
-  if (!modem.init()){
-    Serial.println(" completed.");
-  }
-  else{
-    Serial.println(" failed.");
-  }
+  // Device 2: Modem
+  modemStatus = startModem();
 
+  // Optional internal clock if modem is not present
+  if (modemStatus){
+    timeClient.begin();
+  }
+  
+  // Device 3: GPS sensor
+  GPSStatus = startGPS();
+  
   // Device 4: SD card, disable if using Feather WiFi
   SDStatus = startSD();
+
+  if (!SDStatus){
+    logger.fileNewName(modem.readClock(1));
+    logger.fileRemove(1);
+  }
+
+  //gpsSerial.init();
 }
 
 
@@ -79,7 +102,6 @@ void loop() {
   // compare the previous status to the current status
   if (status != WiFi.status()) {
     // it has changed update the variable
-    Serial.println("Test");
     status = WiFi.status();
 
     if (status == WL_AP_CONNECTED) {
@@ -91,7 +113,7 @@ void loop() {
       Serial.println("Device disconnected from AP");
     }
   }
-  //WiFiClient client = 0;
+  
   WiFiClient client = server.available();   // listen for incoming client
   if (client) {                             // if you get a client,
     Serial.println(client);
@@ -128,17 +150,22 @@ void loop() {
             client.print("<br><br>GPS Serial Device <a href=\"/GPSON\">ON</a> ");
             client.print("Click <a href=\"/GPSOFF\">OFF</a><br>");
             client.print("<br>Latitude = ");
-            client.print(gps.lat());
+            client.print(gps.location.lat());
             client.print("<br>Longitude = ");
-            client.print(gps.lng());
+            client.print(gps.location.lng());
             client.print("<br>Time = ");
-            client.print(gps.time());
+            client.print(String(gps.time.hour())+':'+String(gps.time.minute())+':'+String(gps.time.second()));
 
             client.print("<br><br>Sim Modem <a href=\"/MODEMINIT\">ON</a> ");
             client.print("Click <a href=\"/MODEMOFF\">OFF</a><br>");
             
             client.print("<br><br>SD Card datalogger.txt Click <a href=\"/FILEON\">ON</a> ");
             client.print("Click <a href=\"/FILEOFF\">OFF</a><br>");
+
+            client.print("<br><br>Simcom Mode Clock: ");
+            client.print(modem.readClock(0));
+            client.print("<br><br>Simcom Mode Ping: ");
+            client.print(modem.readIPPing());
 
             client.print("<br><br>CSVString=");
             client.print(dataString);
@@ -178,10 +205,12 @@ void loop() {
         }
         // Check to see if the client request was GPS related
         if (currentLine.endsWith("GET /GPSON")) {
-          GPSEnabled = true;               // GET /H turns the LED on
+          if (GPSStatus){
+            //GPSStatus = gps.init();               // GET /H turns the LED on
+          }
         }
         if (currentLine.endsWith("GET /GPSOFF")) {
-          GPSEnabled = false;                // GET /L turns the LED off
+          GPSStatus = -1;                // GET /L turns the LED off
         }
         if (currentLine.endsWith("GET /MODEMINIT")) {
           modem.init();                  // Entire start-up process for GPS session
@@ -211,39 +240,66 @@ void loop() {
       Serial.print(dataString);
     }
     else if (serial_data == 'f'){
-      //logger.fileDump();
+      logger.fileDump();
     }
     else if (serial_data == 'r'){
-      logger.fileRemove();
+      logger.fileRemove(1);
     }
     else if (serial_data == 'a'){
-      Serial.print("Simcom 7070G Device ID = ");
-      Serial.println(modem.readVerify());
+      Serial.print("Simcom 7070G FTP List = ");
+      Serial.println(modem.ftpList());
+    }
+    else if (serial_data == 'u'){
+      Serial.print("Simcom 7070G FTP Get = ");
+      updateConfig();
+    }
+    else if (serial_data == 's'){
+      Serial.print("Simcom 7070G FTP Put File= ");
+      File tempFile = logger.fileOpen(0);
+      Serial.println(modem.ftpPut(tempFile));
+      tempFile.close();
+    }
+    else if (serial_data == 'S'){
+      Serial.print("Simcom 7070G FTP Put Append Data= ");
+      Serial.println(modem.ftpPut(dataString));
     }
     else if (serial_data == 'e'){
       Serial.print("Simcom 7070G Device Echo Off = ");
       Serial.println(modem.echoOff());
     }
-    else if (serial_data == 'b'){
-      Serial.println("Simcom 7070G Network Activated = ");
-      Serial.println(modem.enableIP());
-    }
+    
     else if (serial_data == 't'){
       Serial.println("Serial Command = t");
       modem.powerToggle();
 
     }
-    else if (serial_data == 'g'){
+    else if (serial_data == 'q'){
       Serial.print("Simcom 7070G 4G Signal = ");
       Serial.println(modem.readSignal());      
+    }
+    else if (serial_data == 'g'){
+      Serial.print("Simcom 7070G GPS Signal = ");
+      Serial.println(modem.readGPS());      
     }
     else if (serial_data == 'h'){
       Serial.print("Simcom 7070G RF Config = ");
       Serial.println(modem.readRFCfg());      
     }
     else if (serial_data == 'c'){
-      Serial.print("Simcom 7070G Clock = ");
-      Serial.println(modem.readClock());
+      Serial.print("Simcom 7070G Date and Time = ");
+      Serial.println(modem.readClock(0));
+    }
+    else if (serial_data == 'C'){
+      Serial.print("Simcom 7070G NTP Server = ");
+      Serial.println(modem.readClock(0));
+    }
+    else if (serial_data == 'z'){
+      Serial.print("Simcom 7070G Reset ");
+      Serial.println(modem.init());
+    }
+    else if (serial_data == 'o'){
+      Serial.print("Simcom 7070G Power On ");
+      Serial.println(modem.powerOn());
     }
     else if (serial_data == 'v'){
       Serial.print("Simcom 7070G NTP = ");
@@ -257,6 +313,65 @@ void loop() {
       Serial.print("Simcom 7070G IP Ping = ");
       Serial.println(modem.readIPPing());
     }
+    else if (serial_data == 'w'){
+      //gps.encode(modem.readGPS());
+      Serial.print("GPS Serial Time = ");
+      Serial.println(String(gps.time.hour())+':'+String(gps.time.minute())+':'+String(gps.time.second()));
+    }
+    else if (serial_data == '1'){
+      Serial.print("Simcom 7070G Disabled = ");
+      Serial.println(modem.GPSOff());
+    }
+    else if (serial_data == '2'){
+      Serial.print("Simcom 7070G Enabled = ");
+      Serial.println(modem.GPSOn());
+    }
+    else if (serial_data == '3'){
+      Serial.print("Simcom 7070G Disabled = ");
+      Serial.println(modem.RFOff());
+    }
+    else if (serial_data == '4'){
+      Serial.print("Simcom 7070G Enabled = ");
+      Serial.println(modem.RFOn());
+    }
+    else if (serial_data == '5'){
+      Serial.println("Simcom 7070G Network Deactivated = ");
+      Serial.println(modem.disableIP());
+    }
+    else if (serial_data == '6'){
+      Serial.println("Simcom 7070G Network Activated = ");
+      Serial.println(modem.enableIP());
+    }
+    else if (serial_data == '7'){
+      Serial.println("Simcom 7070G FTP Reset ");
+      Serial.println(modem.startFTP());
+    }
+    else if (serial_data == 'j'){
+      Serial.println("Simcom 7070G SD Card Directory ");
+      File root;
+      root = SD.open("/");
+      logger.fileDir(root,4);
+      root.close();
+    }
+    else if (serial_data == '!'){
+      Serial.println("Simcom 7070G SD Card Delete All ");
+      
+      logger.fileRemoveAll();
+    }
+    else if (serial_data == 'n'){
+      Serial.print("Simcom 7070G Enabled = ");
+      modem.GPSOff();
+      modem.powerToggle();
+      delay(1000);
+      modem.startSession();
+      modem.startFTP();
+      delay(30000);
+      
+      Serial.println(modem.readIPPing());
+      File tempFile = logger.fileOpen(0);
+      modem.ftpPut(tempFile);
+      tempFile.close();
+    }
    
   }
 
@@ -265,18 +380,46 @@ void loop() {
   }
   
   if ((millis()-LastRead) > LoopDelay){
-    Serial.println(timeClient.getFormattedTime());
+    
     LastRead = millis();
     dataString = "";
+    int option = (updateDelay != 0);
+    Serial.println("Reading sensor");
     dataString += k96.readCSVString();
-    dataString += gps.readResponse();
+    
+    //if(GPSStatus) dataString += modem.readGPS();
+    dataString += gpsSerial.readResponse();
 
-    if(GPSEnabled) GPSEnabled = modem.readGPS();
-
-    dataString = timeClient.getFormattedTime()+','+dataString;
-    if(SDStatus) SDStatus = logger.fileAddCSV(dataString);
-  
-  }  
+    if (modemStatus){
+      dataString = timeClient.getFormattedTime()+','+dataString;
+    }
+    else{
+      dataString = modem.readClock(0)+','+ dataString;
+    }
+    
+    if(!SDStatus) SDStatus = logger.fileAddCSV(dataString, option, modem.readClock(1));
+    
+    if((millis()-LastFileUpload) > fileDelay){
+      Serial.println("File upload");
+      LastFileUpload = millis();
+      File tempFile = logger.fileOpen(0);
+      modem.ftpPut(tempFile);
+      tempFile.close();
+    }
+    else{
+      if (updateDelay && (millis()-LastDataUpload) > updateDelay){
+        Serial.println("File append");
+        LastDataUpload = millis();
+        File tempFile = logger.fileOpen(1);
+        modem.ftpPut(tempFile);
+        tempFile.close();
+        logger.fileRemove(1);
+      }
+      else{
+        updateConfig();
+      }
+    }
+  }    
 }
 
 void printWifiStatus() {
@@ -310,6 +453,59 @@ int startSD(){
   }
   else{
     Serial.println("Card failed, or not present");
-    return -11;
+    return -1;
   }
+}
+
+int startGPS(){
+  // Device 3: GPS Receiver
+  Serial.print("Initializing GPS Receiver...");
+  return 0;
+}
+
+int startModem(){
+  // Device 2: 4G Modem
+  Serial.print("Initializing Simcom 7070G Modem...");
+  if (!modem.init()){
+    Serial.println(" completed");
+    return 0;
+  }
+  else{
+    Serial.println("Modem failed, or not present");
+    return -1;
+  }
+}
+
+/*  updateConfig()
+ * 
+ *  Uses the modems FTP Get function to download a file: "config.json"
+ *  Currently searches for tags for three variables
+ *  LoopDelay, updateDelay, fileDelay
+ *  
+ *  Error: if file is not found, or tag is not present setting is not updated 
+ */
+
+int updateConfig(){
+
+  String json;
+  String result;
+  int found;
+  json = modem.ftpGet();
+  found = json.indexOf("LoopDelay =");
+  if (found >= 0){
+     String result = json.substring(found+12,json.indexOf(";",found+12));
+     LoopDelay = result.toInt();
+  }
+  found = json.indexOf("updateDelay =");
+  if (found >= 0){
+    String result = json.substring(found+14,json.indexOf(";",found+14));
+    updateDelay = result.toInt();
+  }
+  found = json.indexOf("fileDelay =");
+  if (found >= 0){
+    String result = json.substring(found+12,json.indexOf(";",found+12));
+    fileDelay = result.toInt();
+    return 0;
+  }
+  return 1;
 }

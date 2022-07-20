@@ -18,10 +18,8 @@
 */
 #include "GPSSerial.h"
 
-Uart mySerial (&sercom2, GPS_RX, GPS_TX, SERCOM_RX_PAD_3, UART_TX_PAD_2);
-
-void SERCOM2_Handler()
-{
+Uart mySerial (&sercom2, GPS_RX, GPS_TX, SERCOM_RX_PAD_3, UART_TX_PAD_0);
+void SERCOM2_Handler(){
   mySerial.IrqHandler();
 }
 
@@ -30,17 +28,28 @@ GPSSerial::GPSSerial()
 {
 }
 
-void GPSSerial::init(){
+int GPSSerial::init(){
   
   mySerial.begin(GPS_BAUD);
-  mySerial.setTimeout(100);
+  mySerial.setTimeout(GPS_TIMEOUT);
+  pinPeripheral(GPS_RX, PIO_SERCOM); //Assign RX function to pin 11
+  pinPeripheral(GPS_TX, PIO_SERCOM); //Assign TX function to pin 10
+  return 0;
+  if (mySerial.available() > 0){
+    return 0;
+  }
+  else{
+    return -1;
+  }
 }
 
 String GPSSerial::readResponse(){
   while (mySerial.available() > 0){
     gps.encode(mySerial.read());
+    Serial.println("GPS data");
   }
-  return (String(gps.location.rawLat().billionths)+','+String(gps.location.rawLng().billionths)+','+String(gps.time.hour())+
+  return (String('.'+gps.location.rawLat().billionths)+','
+         +String(gps.location.rawLng().billionths)+','+String(gps.time.hour())+
                       ':'+String(gps.time.minute())+':'+String(gps.time.second())+','+String(gps.altitude.meters())+',');
 }
 
@@ -53,5 +62,5 @@ float GPSSerial::lng(){
 }
 
 String GPSSerial::time(){
-  return String(gps.time.value());
+  return (String(gps.time.hour())+':'+String(gps.time.minute())+':'+String(gps.time.second()));
 }
