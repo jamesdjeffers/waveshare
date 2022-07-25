@@ -2,7 +2,8 @@
   
   Senseair K96 sensors use modbus protocol to transfer data over serial.
   Each command is 7 bytes that request a memory transfer of a given number of bytes.
-  The 
+  Each response is 8 bytes, the reply plus carriage return
+  The error status register is 16 bits at memory location 0x0A
   
   Copyright (c) 2022 University of Oklahoma.  All right reserved.
 
@@ -28,7 +29,7 @@
 #define K96_BAUD      115200
 #define K96_TIMEOUT   200
 
-#define K96_POWER     A0
+#define K96_POWER     A0            // Device enable pin
 
 #include <Arduino.h>
 
@@ -48,7 +49,8 @@ private:
       
     int k96_memory[9] = {1,1,1,1,1,1,1,1,1};
     long k96MemoryLong[3] = {1,1,1};
-    int wordConvert(byte high, byte low);
+    int wordS16(byte high, byte low);
+    int wordU16(byte high, byte low);
     long longConvert(byte highest, byte higher, byte lower, byte lowest);
  
 public:

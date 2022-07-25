@@ -28,10 +28,20 @@ int DataLogger::init(){
   return !SD.begin(SD_CS);
 }
 
-void DataLogger::fileDump(){
+vint DataLogger::fileDump(int option){
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
-  File dataFile = SD.open(fileName);
+  String temp;
+  if (option == 0){
+    temp = fileName;
+  }
+  else if (option == 1){
+    temp = LOG_DATA;
+  }
+  else if (option == 2){
+    temp = LOG_SYS;
+  }
+  File dataFile = SD.open(temp);
 
   // if the file is available, write to it:
   if (dataFile) {
@@ -39,12 +49,17 @@ void DataLogger::fileDump(){
       Serial.write(dataFile.read());
     }
     dataFile.close();
+    return 0;
   }
   // if the file isn't open, pop up an error:
   else {
-    Serial.println("error opening datalog.txt");
+    return 1;
   }
 }
+
+/*
+ * Delete a file on the SD card
+ */
 
 void DataLogger::fileRemove(int option){
   // open the file. note that only one file can be open at a time,
@@ -57,6 +72,10 @@ void DataLogger::fileRemove(int option){
     Serial.println("example.txt doesn't exist.");
   }
 }
+
+/*
+ * Delete all files on SD card
+ */
 void DataLogger::fileRemoveAll(){
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
@@ -76,30 +95,44 @@ void DataLogger::fileRemoveAll(){
 
 }
 
-int DataLogger::fileAddCSV(String csvString, int option, String dateString){
+/*
+ * Check the size of the current data file
+ */
+int DataLogger::fileCheckSize(){
+  File dataFile = SD.open(fileName);
+  int fileSize = dataFile.size();
+  dataFile.close();
+  return fileSize;
+}
+
+/*
+ *  Add a single line of text to a new/existing file
+ */
+int DataLogger::fileAddCSV(String csvString, int option){
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
-    File dataFile = SD.open(fileName, FILE_WRITE);
-
-    if (dataFile.size() > LOG_MAX_SIZE){
-      dataFile.close();
-      fileNewName(dateString);
-      dataFile = SD.open(fileName, FILE_WRITE);
-    }
+    File dataFile;
+    
     // if the file is available, write to it, else log error
-    if (dataFile) {
-      dataFile.println(csvString);
-      dataFile.close();
+    if (option <= 1) {
+      dataFile = SD.open(fileName, FILE_WRITE);
+      if (dataFile) {
+        dataFile.println(csvString);
+        dataFile.close();
+      }
     }
-    else {
-      return 1;
-    }
-
-    if (!option){
-      return 0;
-    }
-    else if (option == 1){
+    
+    if (option == 1){
       dataFile = SD.open(LOG_DATA, FILE_WRITE);
+      // if the file is available, write to it, else log error
+      if (dataFile) {
+        dataFile.println(csvString);
+        dataFile.close();
+        return 0;
+      }
+    }
+    else if (option == 2){
+      dataFile = SD.open(LOG_SYS, FILE_WRITE);
       // if the file is available, write to it, else log error
       if (dataFile) {
         dataFile.println(csvString);
@@ -132,6 +165,10 @@ void DataLogger::fileDir(File dir, int numTabs) {
     entry.close();
   }
 }
+
+/*
+ * The total number of files in the directory
+ */
 int DataLogger::fileCount(File dir){
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
@@ -148,6 +185,9 @@ int DataLogger::fileCount(File dir){
   }
 }
 
+/*
+ * The number of files containing the string input: fileName
+ */
 int DataLogger::fileCount(File dir, String fileName){
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
@@ -186,6 +226,17 @@ void DataLogger::fileNewName(String dateTime){
 
 }
 
+/*
+ * opens one of the file objects associated with current data stream
+ */
+String DataLogger::fileNameString(){
+
+  return fileName;   
+}
+
+/*
+ * opens one of the file objects associated with current data stream
+ */
 File DataLogger::fileOpen(int option){
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.

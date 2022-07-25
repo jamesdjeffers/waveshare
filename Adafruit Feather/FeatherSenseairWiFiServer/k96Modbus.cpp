@@ -1,5 +1,5 @@
 /* k96Modbus.cpp - Library for serial data transfer to Senseair K96 NDIR
-  Copyright (c) 2022 Jeffers Emerging Technologies, LLC.  All right reserved.
+  Copyright (c) 2022 University of Oklahoma.  All right reserved.
 
   This library is free software; you can redistribute it and/or
   modify it under the terms of the GNU Lesser General Public
@@ -33,7 +33,13 @@ void k96Modbus::init(){
   digitalWrite(K96_POWER,HIGH);
 }
 
-int k96Modbus::wordConvert(byte high, byte low){
+int k96Modbus::wordS16(byte high, byte low){
+  int result = ((high*256) + low);
+  if (result > 32768) result -= 65535;
+  return result;
+}
+
+int k96Modbus::wordU16(byte high, byte low){
   return ((high*256) + low);
 }
 
@@ -44,7 +50,7 @@ long k96Modbus::longConvert(byte highest, byte higher, byte lower, byte lowest){
 int k96Modbus::readResponse(){
   byte test[8];
   Serial1.readBytes(test,8);
-  return wordConvert(test[3],test[4]);
+  return wordU16(test[3],test[4]);
 }
 
 long k96Modbus::readResponseLong(){
@@ -56,12 +62,12 @@ long k96Modbus::readResponseLong(){
 int k96Modbus::readResponse(int numBytes){
   byte test[6+numBytes];
   int responseBytes = Serial1.readBytes(test,6+numBytes);
-  k96_memory[0] = wordConvert(test[3],test[4]);
-  k96_memory[1] = wordConvert(test[5],test[6]);
-  k96_memory[2] = wordConvert(test[7],test[8]);
-  k96_memory[3] = wordConvert(test[9],test[10]);
-  k96_memory[4] = wordConvert(test[11],test[12]);
-  k96_memory[5] = wordConvert(test[13],test[14]);
+  k96_memory[0] = wordS16(test[3],test[4]);
+  k96_memory[1] = wordS16(test[5],test[6]);
+  k96_memory[2] = wordS16(test[7],test[8]);
+  k96_memory[3] = wordS16(test[9],test[10]);
+  k96_memory[4] = wordS16(test[11],test[12]);
+  k96_memory[5] = wordS16(test[13],test[14]);
   return responseBytes;
 }
 
@@ -75,7 +81,7 @@ String k96Modbus::readCSVString(){
   String dataString = "";
   writeCommand(0);
   int readStatus = readResponse(14);
-  if(readStatus > 0){
+  if(readStatus > 14){
     for(int i=0; i<6; i++){
       dataString += (String(k96_memory[i]) + ',');
     }
@@ -90,7 +96,7 @@ String k96Modbus::readCSVString(){
     writeCommand(5);
     k96_memory[7] = readResponse();
     dataString += String(k96_memory[7]);
-    return dataString;
+    return dataString + ",";
   }
   else{
     return "-,-,-,-,-,-,-,-,-,-,-,";
@@ -98,25 +104,9 @@ String k96Modbus::readCSVString(){
   
 }
 
-/*String k96Modbus::readCSVString2(){
-  String dataString = "";
-  writeCommand(0);
-  k96_memory[0] = readResponse(14);
-  dataString += String(k96_memory[0]) + ",";
-  writeCommand(0);
-  readResponse(14);
-  writeCommand(1);
-  k96_memory[1] = readResponse(4);
-  dataString += String(k96_memory[1]) + ",";
-  writeCommand(2);
-  k96_memory[2] = readResponse(4);
-  writeCommand(3);
-  k96_memory[3] = readResponse(4);
-  writeCommand(4);
-  k96_memory[4] = readResponse(2);
-  return dataString;
-}*/
-
+/*
+ * Returns
+ */
 String k96Modbus::readByteString(int byteAddress){
   return String(labels[byteAddress]+k96_memory[byteAddress]);
 }

@@ -27,7 +27,7 @@
 
 #define MODEM_BUFFER 1360
 
-#define MODEM_POWER     5
+#define MODEM_POWER     6
 
 #define ATI        "ATI"                            // Device info, query purposes
 #define ATE_OFF    "ATE0"                           // Turns off echo mode
@@ -61,13 +61,13 @@
 
 #define AT_FTP_EXT "AT+FTPQUIT"
 #define AT_FTP_CID "AT+FTPCID=1"
-#define AT_FTP_SRV "AT+FTPSERV=\"TODO\""
-#define AT_FTP_UN  "AT+FTPUN=\"TODO\""
-#define AT_FTP_PWD "AT+FTPPW=\"TODO\""
+#define AT_FTP_SRV "AT+FTPSERV=\"ftp.weng.oucreate.com\""
+#define AT_FTP_UN  "AT+FTPUN=\"yang@weng.oucreate.com\""
+#define AT_FTP_PWD "AT+FTPPW=\"OUWeng2848\""
 #define AT_FTP_PRT "AT+FTPPORT=21"
 #define AT_FTP_TYP "AT+FTPTYPE=\"I\""
 
-#define AT_FTP_GET_NAM "AT+FTPGETNAME=\"TODO\""
+#define AT_FTP_GET_NAM "AT+FTPGETNAME=\"config.json\""
 #define AT_FTP_GET_PTH "AT+FTPGETPATH=\"/\""
 
 #define AT_FTP_PUT_NA1 "AT+FTPPUTNAME=\"\""
