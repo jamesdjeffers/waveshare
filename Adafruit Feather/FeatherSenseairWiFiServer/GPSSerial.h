@@ -1,5 +1,5 @@
-/* k96Modbus.h - Library for serial data transfer to Senseair K96 NDIR
-  Copyright (c) 2022 Jeffers Emerging Technologies, LLC.  All right reserved.
+/* GPSSerial.h - functions for serial data transfer from GPS unit
+  Copyright (c) 2022 University of Oklahoma.  All right reserved.
 
   This library is free software; you can redistribute it and/or
   modify it under the terms of the GNU Lesser General Public
@@ -20,11 +20,13 @@
 #ifndef GPSSerial_h
 #define GPSSerial_h
 
-#define GPS_RX        21
-#define GPS_TX        20
+#define GPS_RX        5         // Using SERCOM2
+#define GPS_TX        2         // Pin is not accessible on device
 #define GPS_BAUD      9600
-#define GPS_TIMEOUT   200
+#define GPS_TIMEOUT   100       // Data stream is constant and regular
 
+#include <Arduino.h>            // required before wiring_private.h
+#include "wiring_private.h"     // pinPeripheral() function
 // The TinyGPS++ object
 #include <TinyGPS++.h>
 
@@ -36,7 +38,7 @@ class GPSSerial
 
   public:
     GPSSerial();
-    void init();
+    int init();
     String readResponse();
     
     float lng();

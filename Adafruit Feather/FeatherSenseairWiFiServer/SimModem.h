@@ -25,9 +25,16 @@
 #define modemBaud 9600
 #define modemTimeout 200
 
+#define MODEM_BUFFER 1360
+
+#define MODEM_POWER     6
+
 #define ATI        "ATI"                            // Device info, query purposes
 #define ATE_OFF    "ATE0"                           // Turns off echo mode
 #define AT_CSQ     "AT+CSQ"                         // 4G-LTE signal strength
+#define AT_CPSI     "AT+CPSI?"
+#define AT_GSN     "AT+GSN"
+#define AT_CGATT   "AT+CGATT?"
 
 #define AT_RF_ON   "AT+CFUNC=1"
 #define AT_RF_OFF  "AT+CFUNC=0"
@@ -42,34 +49,69 @@
 
 #define AT_NET_0ON "AT+CNACT=0,1"
 #define AT_NET_1ON "AT+CNACT=1,1"
+#define AT_NET_1OF "AT+CNACT=1,0"
 
 #define AT_NTP_ID  "AT+CNTPCID=1"                    // ADP Configuration query
-#define AT_NTP_SET "AT+CNTP=\"time.nist.gov\",1"    // NIST server, ADP = 1
+#define AT_NTP_SET "AT+CNTP=\"time.nist.gov\",-20"    // NIST server, Time Zone
 #define AT_NTP_UP  "AT+CNTP"                        // Update the NTP server
 #define AT_TIME    "AT+CCLK?"                       // Dat and Time string query 
 
 #define AT_SNPDPID "AT_SNPDPID=1"
 #define AT_IP_PING "AT+SNPING4=\"www.google.com\",1,16,1000"
 
+#define AT_FTP_EXT "AT+FTPQUIT"
+#define AT_FTP_CID "AT+FTPCID=1"
+#define AT_FTP_SRV "AT+FTPSERV=\"TODO\""
+#define AT_FTP_UN  "AT+FTPUN=\"TODO\""
+#define AT_FTP_PWD "AT+FTPPW=\"TODO\""
+#define AT_FTP_PRT "AT+FTPPORT=21"
+#define AT_FTP_TYP "AT+FTPTYPE=\"I\""
+
+#define AT_FTP_GET_NAM "AT+FTPGETNAME=\"TODO\""
+#define AT_FTP_GET_PTH "AT+FTPGETPATH=\"/\""
+
+#define AT_FTP_PUT_NM1 "AT+FTPPUTNAME="
+#define AT_FTP_PUT_PTH "AT+FTPPUTPATH=\"/\""
+#define AT_FTP_PUT_NEW "AT+FTPPUTOPT=\"STOR\""
+#define AT_FTP_PUT_APP "AT+FTPPUTOPT=\"APPE\""
+
+#define AT_FTP_LST "AT+FTPLIST=1"
+#define AT_FTP_LRD "AT+FTPLIST=2,1024"
+#define AT_FTP_GET "AT+FTPGET=1"
+#define AT_FTP_GRD "AT+FTPGET=2,1024"
+#define AT_FTP_PUT "AT+FTPPUT=1"
+#define AT_FTP_PWR "AT+FTPPUT=2,"
+#define AT_FTP_PWX "AT+FTPPUT=2,1360"
+#define AT_FTP_PDN "AT+FTPPUT=2,0"
+
+#define AT_GPS_PWR "AT+CGNSPWR=1"
+#define AT_GPS_OFF "AT+CGNSPWR=0"
+#define AT_GPS_RD  "AT+CGNSINF"
+
 #include <Arduino.h>        // required before wiring_private.h
 #include "wiring_private.h" // pinPeripheral() function
+#include <SD.h>
 
 class SimModem
 {
 private:
   
-  char SimModemBuffer [1024] = "";
+  char SimModemBuffer [1360] = "";
   bool SimModemEnabled = false;
-  int SimModemBufferIndex  = 0;
   
 public:
   SimModem();
   int init();
   void powerToggle();
   int powerOn();
-
+  int startSession();
+  
+  int startNTP();
+  int startFTP();
   // Parses the entire strings received from modem
-  String readResponse(String command);
+  String readResponse(String command, int waitTime);
+  String readWaitResponse(String command, int waitTime, String back);
+  String readBurst(String command, int waitTime, String back);
 
   //
   String echoOff();
@@ -81,12 +123,26 @@ public:
   String readSignal();
   String readRFCfg();
   
-  String readClock();
+  String readClock(int format);
   String readClockID();
   
   String readIP();
   String readIPPing();
-  String enableIP();
+  int enableIP();
+  
+  String disableIP();
+
+  String ftpList();
+  String ftpGet();
+  
+  String ftpPut(String dataString);
+  int ftpPut(File dataFile, int option);
+
+  String GPSOn();
+  String GPSOff();
+
+  String RFOn();
+  String RFOff();
 };
 
 #endif

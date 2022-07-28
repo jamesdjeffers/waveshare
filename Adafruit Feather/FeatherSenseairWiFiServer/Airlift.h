@@ -55,25 +55,27 @@ char ssid[] = "nanophotonics"; // created AP name
 char pass[] = "1234567890";      // AP password (needed only for WEP, must be exactly 10 or 26 characters in length)
 int keyIndex = 0;                // your network key Index number (needed only for WEP)
 
-bool WiFiEnabled = true;
 int status = WL_IDLE_STATUS;
 WiFiServer server(80);
 
-bool airliftInit(){
+/*
+ * Initialize the wireless network, will cause error without Airlift
+ * Commented lines are for the Feather WiFi module using WiFi library
+ * 
+ */
+int airliftInit(){
   // WiFi.config(IPAddress(10, 0, 0, 1));
   WiFi.setPins(SPIWIFI_SS, SPIWIFI_ACK, ESP32_RESETN, ESP32_GPIO0, &SPIWIFI);
   //WiFi.setPins(8,7,4,2);
   if (WiFi.status() == WL_NO_SHIELD) {
-    Serial.println("WiFi shield not present");
-    WiFiEnabled = false;
-  } else{
-     status = WiFi.beginAP(ssid);
-    if (status != WL_AP_LISTENING) {
-      Serial.println("Creating access point failed");
-      WiFiEnabled = false;
-    }
-    // start the web server on port 80
-    server.begin();
+    return 1;
   }
-  return !(WiFi.status() == WL_NO_SHIELD);
+  else{
+    status = WiFi.beginAP(ssid);
+    if (status != WL_AP_LISTENING) {
+      return 2;
+    }
+    server.begin();       // start the web server on port 80
+    return 0;
+  }
 }
