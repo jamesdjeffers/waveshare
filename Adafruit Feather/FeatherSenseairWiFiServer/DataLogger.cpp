@@ -28,7 +28,7 @@ int DataLogger::init(){
   return !SD.begin(SD_CS);
 }
 
-vint DataLogger::fileDump(int option){
+int DataLogger::fileDump(int option){
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
   String temp;
@@ -36,10 +36,10 @@ vint DataLogger::fileDump(int option){
     temp = fileName;
   }
   else if (option == 1){
-    temp = LOG_DATA;
+    temp = TEMP_DATA;
   }
   else if (option == 2){
-    temp = LOG_SYS;
+    temp = logName;
   }
   File dataFile = SD.open(temp);
 
@@ -61,15 +61,16 @@ vint DataLogger::fileDump(int option){
  * Delete a file on the SD card
  */
 
-void DataLogger::fileRemove(int option){
+int DataLogger::fileRemove(int option){
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
   String file = fileName;
-  if (option) file = LOG_DATA;
+  if (option) file = TEMP_DATA;
   if (SD.exists(file)) {
     SD.remove(file);
+    return 0;
   } else {
-    Serial.println("example.txt doesn't exist.");
+    return -1;
   }
 }
 
@@ -123,7 +124,7 @@ int DataLogger::fileAddCSV(String csvString, int option){
     }
     
     if (option == 1){
-      dataFile = SD.open(LOG_DATA, FILE_WRITE);
+      dataFile = SD.open(TEMP_DATA, FILE_WRITE);
       // if the file is available, write to it, else log error
       if (dataFile) {
         dataFile.println(csvString);
@@ -132,7 +133,7 @@ int DataLogger::fileAddCSV(String csvString, int option){
       }
     }
     else if (option == 2){
-      dataFile = SD.open(LOG_SYS, FILE_WRITE);
+      dataFile = SD.open(logName, FILE_WRITE);
       // if the file is available, write to it, else log error
       if (dataFile) {
         dataFile.println(csvString);
@@ -142,6 +143,11 @@ int DataLogger::fileAddCSV(String csvString, int option){
     }
     return 1;
 }
+
+/*
+ *  List the files in the directory
+ */
+
 void DataLogger::fileDir(File dir, int numTabs) {
   while (true) {
 
@@ -206,13 +212,17 @@ int DataLogger::fileCount(File dir, String fileName){
   }
 }
 
+/*
+ *  Create a new file on the SD card using the date string
+ *  File names are limited to 8 characters: YYMMDD_x.csv
+ *  x (maximum 62) = 0-9,A-Z,a-z
+ */
 void DataLogger::fileNewName(String dateTime){
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
   File root;
   root = SD.open("/");
   String fileID = "";
-  //int numFiles = fileCount(root);
   int numFiles = fileCount(root,dateTime);
   if (numFiles >= 10){
     numFiles += 55;
@@ -235,15 +245,33 @@ String DataLogger::fileNameString(){
 }
 
 /*
+ *  Create a new file on the SD card using the date string
+ *  File names are limited to 8 characters: YYMMDD_x.csv
+ *  x (maximum 62) = 0-9,A-Z,a-z
+ */
+void DataLogger::logNewName(){
+  // open the file. note that only one file can be open at a time,
+  // so you have to close this one before opening another.
+  File root;
+  root = SD.open("/");
+  logName = "LOG" + String(fileCount(root,"LOG")) + ".txt";
+  root.close();
+}
+/*
  * opens one of the file objects associated with current data stream
  */
 File DataLogger::fileOpen(int option){
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
   
-    if (!option){
+    if (option == 1){
+      return SD.open(TEMP_DATA);
+    }
+    else if (option == 2) {
+      return SD.open(logName);
+    }
+    else{
       return SD.open(fileName);
     }
-    return SD.open(LOG_DATA);
     
 }

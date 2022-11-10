@@ -24,8 +24,7 @@
 #define DataLogger_h
 
 #define SD_CS         4
-#define LOG_DATA      "data.csv"
-#define LOG_SYS       "log.txt"
+#define TEMP_DATA      "data.csv"
 #define LOG_MAX_SIZE  12240
 
 #include <SPI.h>
@@ -35,11 +34,12 @@ class DataLogger
 {
   private:
     String fileName = "yyddmm_0.csv";
+    String logName = "log0.txt";
 
   public:
     DataLogger();
     int init();
-    void fileDump(int option);
+    int fileDump(int option);
     int fileRemove(int option);
     void fileRemoveAll();
     int fileCheckSize();
@@ -51,6 +51,7 @@ class DataLogger
     
     void fileNewName(String dateTime);
     String fileNameString();
+    void logNewName();
     File fileOpen(int option);
   
 };

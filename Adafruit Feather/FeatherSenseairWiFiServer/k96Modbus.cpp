@@ -26,12 +26,17 @@ k96Modbus::k96Modbus()
  * Serial Port Output pins TX, RX
  * Baud Rate = 115200, Parity = None, Stop bits = 2
  */
-void k96Modbus::init(){
+int k96Modbus::init(){
   Serial1.begin(K96_BAUD,SERIAL_8N2);
   Serial1.setTimeout(K96_TIMEOUT);
   pinMode(K96_POWER,OUTPUT);
   digitalWrite(K96_POWER,HIGH);
+  return 0;
 }
+
+/*
+ *  signed 16 bit number
+ */
 
 int k96Modbus::wordS16(byte high, byte low){
   int result = ((high*256) + low);
@@ -39,14 +44,23 @@ int k96Modbus::wordS16(byte high, byte low){
   return result;
 }
 
+/*
+ *  unsigned 16 bit number
+ */
 int k96Modbus::wordU16(byte high, byte low){
   return ((high*256) + low);
 }
 
+/*
+ *  unsigned 32 bit number
+ */
 long k96Modbus::longConvert(byte highest, byte higher, byte lower, byte lowest){
   return ((highest*16777216)+(higher*65536)+(lower*256) + lowest);
 }
 
+/*
+ *  Read 2 bytes for an unsigned 16 bit number
+ */
 int k96Modbus::readResponse(){
   byte test[8];
   Serial1.readBytes(test,8);
@@ -90,16 +104,13 @@ String k96Modbus::readCSVString(){
     dataString += (String(k96_memory[6]) + ',');
     for(int i=2; i<5; i++){
       writeCommand(i);
-      k96MemoryLong[i-2] = readResponseLong();
-      dataString += (String(k96MemoryLong[i-2]) + ',');
+      k96_memory[i+5] = readResponse();
+      dataString += (String(k96_memory[i+5])+',');
     }
-    writeCommand(5);
-    k96_memory[7] = readResponse();
-    dataString += String(k96_memory[7]);
-    return dataString + ",";
+    return dataString;
   }
   else{
-    return "-,-,-,-,-,-,-,-,-,-,-,";
+    return "-,-,-,-,-,-,-,-,-,-,";
   }
   
 }
@@ -109,4 +120,19 @@ String k96Modbus::readCSVString(){
  */
 String k96Modbus::readByteString(int byteAddress){
   return String(labels[byteAddress]+k96_memory[byteAddress]);
+}
+
+/*
+ * Returns
+ */
+String k96Modbus::readSensorID(){
+  writeCommand(5);
+  return String(readResponseLong());
+}
+
+String k96Modbus::readSensorFW(){
+  byte test[10];
+  writeCommand(6);
+  Serial1.readBytes(test,10);
+  return (String(test[3])+"."+String(test[4]) +"."+ String(test[5]) +"."+ String(test[6]));
 }

@@ -57,7 +57,7 @@
 #define AT_TIME    "AT+CCLK?"                       // Dat and Time string query 
 
 #define AT_SNPDPID "AT_SNPDPID=1"
-#define AT_IP_PING "AT+SNPING4=\"www.google.com\",1,16,1000"
+#define AT_IP_PING "AT+SNPING4=\"ftp.weng.oucreate.com\",1,16,1000"
 
 #define AT_FTP_EXT "AT+FTPQUIT"
 #define AT_FTP_CID "AT+FTPCID=1"
@@ -67,11 +67,9 @@
 #define AT_FTP_PRT "AT+FTPPORT=21"
 #define AT_FTP_TYP "AT+FTPTYPE=\"I\""
 
-#define AT_FTP_GET_NAM "AT+FTPGETNAME=\"\""
+#define AT_FTP_GET_NAM "AT+FTPGETNAME=\"config.json\""
 #define AT_FTP_GET_PTH "AT+FTPGETPATH=\"/\""
 
-#define AT_FTP_PUT_NA1 "AT+FTPPUTNAME=\"\""
-#define AT_FTP_PUT_NA2 "AT+FTPPUTNAME=\"\""
 #define AT_FTP_PUT_NM1 "AT+FTPPUTNAME="
 #define AT_FTP_PUT_PTH "AT+FTPPUTPATH=\"/\""
 #define AT_FTP_PUT_NEW "AT+FTPPUTOPT=\"STOR\""
@@ -130,7 +128,7 @@ public:
   
   String readIP();
   String readIPPing();
-  String enableIP();
+  int enableIP();
   
   String disableIP();
 
@@ -138,7 +136,7 @@ public:
   String ftpGet();
   
   String ftpPut(String dataString);
-  String ftpPut(File dataFile);
+  int ftpPut(File dataFile, int option);
 
   String GPSOn();
   String GPSOff();

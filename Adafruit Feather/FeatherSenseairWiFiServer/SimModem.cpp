@@ -52,10 +52,11 @@ int SimModem::init()
   delay(1000);
   
   // Enable the modem (do not cycle the power if not needed)
-  startSession();
-  startFTP();
-
-  return 0;
+  if (!startSession()){
+    // startFTP();
+    return 0;
+  }
+  return -1;
 }
 
 
@@ -180,9 +181,8 @@ String SimModem::readBurst(String command, int waitTime, String back){
 void SimModem::powerToggle(){
   digitalWrite(MODEM_POWER,HIGH);
   delay(2000);
-  digitalWrite(MODEM_POWER,LOW);
-  delay(2000);
   SimModemSerial.flush();
+  Serial.println("Modem toggle");
 }
 
 /*  "powerOn" the Modem using digital trigger
@@ -198,7 +198,7 @@ int SimModem::powerOn(){
   }
   else{
     powerToggle();
-    delay(40000);
+    delay(35000);
     SimModemSerial.flush();
     readResponse(ATE_OFF,0);
     responseString = readResponse(ATE_OFF,0);
@@ -238,16 +238,17 @@ int SimModem::startSession(){
     // readResponse(AT_RF_CFG,0);
     // readResponse(AT_RF_ON,0);
     // delay(1000);
-    if (enableIP() == "Connected"){
+    if (enableIP() >= 0){
       startNTP();
+      startFTP();
     }
     
   }
   else{
-    if (enableIP() == "Connected"){
+    if (enableIP() >= 0){
       startNTP();
+      startFTP();
     }
-    
   }
   return 0;
 }
@@ -311,9 +312,13 @@ String SimModem::readVerify(){
  */
 String SimModem::readClock(int format){
   String dateTimeResponse = readWaitResponse(AT_TIME,0,"CCLK:");
-  if (dateTimeResponse == ""){
+  if (dateTimeResponse == "test"){
     powerOn();
     enableIP();
+    dateTimeResponse = readWaitResponse(AT_TIME,0,"CCLK:");
+    if (dateTimeResponse == ""){
+      return "Clock, Error";
+    }
   }
   else if (dateTimeResponse == "ERROR"){
     return "ERROR";
@@ -369,19 +374,19 @@ String SimModem::readIPPing(){
  * Turn off the command echo function
  */
  
-String SimModem::enableIP(){
+int SimModem::enableIP(){
   for (int i = 0; i<5; i++){
     String string = readWaitResponse(AT_NET_1ON,2000,"PDP:");
     
     if (string.indexOf("Active") >= 0){
-      return "Connected";
+      return 0;
     }
     else if (string.indexOf("ERROR") >= 0){
-      return "Active";
+      return 1;
     }
     delay(5000);
   }
-  return "No network";
+  return -1;
 }
 
 /*
@@ -419,37 +424,68 @@ String SimModem::ftpList(){
  * File read operation for small files
  */
 String SimModem::ftpGet(){
-  startSession();
-  startFTP();
-  readWaitResponse(AT_FTP_GET,5000,"FTPGET:");  
-  String file = readBurst(AT_FTP_GRD,5000,"FTPGET:");
-  readWaitResponse(AT_FTP_EXT,1000,"FTPGET: 1,80");
-  return file;
+  
+  String responseString = readWaitResponse(AT_FTP_GET,5000,"FTPGET:");
+  if (responseString.indexOf("1,1") < 0){
+    int modem = startSession();
+    if (modem < 0){
+      return "ERROR_62";
+    }
+    startFTP();
+    responseString = readWaitResponse(AT_FTP_GET,5000,"FTPGET:");
+  }
+  if (responseString.indexOf("1,1") >= 0){
+    String file = readBurst(AT_FTP_GRD,5000,"FTPGET:");
+    readWaitResponse(AT_FTP_EXT,1000,"FTPGET: 1,80");
+    return file;
+  }
+  else return "";
 }
-/*
- *  File read operation for small files
+/*********************************************************************
+ *  PUT operation for small files
+ *  
+ *  Input: dataFile (position may not be at start of file)
+ *  Input: option (selects upload file name)
+ *  
+ *  Determines size of data to upload (from current file postion to end)
+ *  Determines number of transfers at largest transfer size of 1360
+ *  Determines size of last transfer less than maximum
+ *  
+ *  Output: 0 = successful transfer, received OK
  */
-String SimModem::ftpPut(File dataFile){
+int SimModem::ftpPut(File dataFile, int option){
   
   // Check that modem is present, powered on, connected to network
-  String actionLog;
   int modem = startSession();
   if(modem < 0){
-    return "No network";
+    return -62;
   }
-  
   startFTP();
+  
+  String responseString;
   char temp;
-  int dataSize = dataFile.size();
+  int dataSize = dataFile.size() - dataFile.position();
   int numPuts = dataSize / 1360;
   int lastPutSize = dataSize % 1360;
   String lastPutString = AT_FTP_PWR + String(lastPutSize);
   String imei = readResponse(AT_GSN,0);
   imei = imei.substring(0,(imei.length()-1)) + "_";
-  String putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + dataFile.name() + String("\"");
-  String responseString;
-  
+  String putFileName;
+
+  if (option == 0){
+    putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + dataFile.name() + String("\"");
+    readResponse(AT_FTP_PUT_APP,0);
+  }
+  else if (option == 1){
+    putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + dataFile.name() + String("\"");
+    readResponse(AT_FTP_PUT_APP,0);
+  }
+  else if (option == 2){
+    putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + "log.txt" + String("\"");
+    readResponse(AT_FTP_PUT_APP,0);
+  }
   readResponse(putFileName,0);
+  
   responseString = readWaitResponse(AT_FTP_PUT,3000,"FTPPUT:");  
 
   if (responseString.indexOf("1,1") >= 0){
@@ -474,11 +510,12 @@ String SimModem::ftpPut(File dataFile){
       SimModemSerial.flush();
     }
     responseString = readWaitResponse(AT_FTP_PDN,0,"OK");
+    //readResponse(AT_FTP_EXT,0);
     if (responseString){
-      return "Done";
+      return 0;
     }
   }  
-  return "Failed";
+  return -1;
 }
 
 /*
@@ -489,7 +526,6 @@ String SimModem::ftpPut(String dataString){
   char temp;
   int dataSize = dataString.length()+1;
   String putString = AT_FTP_PWR + String(dataSize);
-  readResponse(AT_FTP_PUT_NA2,0);
   readResponse(AT_FTP_PUT_APP,0);
   
   readWaitResponse(AT_FTP_PUT,3000,"FTPPUT:");
@@ -504,7 +540,7 @@ String SimModem::ftpPut(String dataString){
   SimModemSerial.flush();
   
   readWaitResponse(AT_FTP_PDN,0,"OK");
-  //readWaitResponse(AT_FTP_EXT,0,"FTPPUT: 1,80");
+  readWaitResponse(AT_FTP_EXT,0,"FTPPUT: 1,80");
   return "Done";
 }
 
