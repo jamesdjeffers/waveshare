@@ -33,6 +33,7 @@
 class DataLogger
 {
   private:
+    int status = -1;
     String fileName = "yyddmm_0.csv";
     String logName = "log0.txt";
 

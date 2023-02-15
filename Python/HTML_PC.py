@@ -9,7 +9,7 @@ import time
 
 TIMEOUT_DEFAULT=0.2
 
-ser = serial.Serial("COM27",115200,timeout=TIMEOUT_DEFAULT)
+ser = serial.Serial("COM10",115200,timeout=TIMEOUT_DEFAULT)
 command_input = ''
 rec_buff = ''
 
@@ -59,7 +59,7 @@ def readWaitResponse(string, back, responseDelay):
     ser.timeout = TIMEOUT_DEFAULT
     rec_buff = ser.read_until('\n',1024)
     if len(rec_buff) > 1:
-        test = 3;
+        test = 3
         print (rec_buff.decode())
     while (back.encode() not in rec_buff) and (b'ERROR' not in rec_buff):
         if len(rec_buff) > 1:
@@ -112,7 +112,7 @@ def modemInit():
 def modemClock():
     readResponse('AT+CNTPCID=1',0)
     readResponse('AT+CNTP="time.nist.gov",1',0)
-    time.sleep(1);
+    time.sleep(1)
     readResponse('AT+CNTP',1)
     readResponse('AT+CCLK?',0)
 
@@ -169,7 +169,7 @@ def modemHTTPSRead():
         readResponse('AT+SHREAD=2048,2048',0)                
         readResponse('AT+SHREAD=4096,2048',0)
     except:
-        print('HTTPS read feiled')
+        print('HTTPS read failed')
 
 def modemEmailCount():
     #readResponse('AT+CSSLCFG=?',0)
@@ -205,34 +205,50 @@ def modemFTPConfig():
     readResponse('AT+FTPQUIT',0)
     readResponse('AT+FTPCID=1',0)
     readResponse('AT+FTPSERV="ftp.weng.oucreate.com"',0)
-    readResponse('AT+FTPUN="james@weng.oucreate.com"',0)
-    readResponse('AT+FTPPW="OUWeng2848"',0)
+    readResponse('AT+FTPUN="yang@weng.oucreate.com"',0)
+    readResponse('AT+FTPPW="NPLOUWeng2848"',0)
     readResponse('AT+FTPGETNAME="config.json"',0)
-    readResponse('AT+FTPGETPATH="/861340049860164/"',0)
+    readResponse('AT+FTPGETPATH="/"',0)
     readResponse('AT+FTPPUTNAME="temp.txt"',0)
-    readResponse('AT+FTPPUTPATH="/861340049860164/"',0)
+    readResponse('AT+FTPPUTPATH="/"',0)
     readResponse('AT+FTPPORT=21',0)
 
 def modemFTPList():
     
     opTimeStart = time.time()
+    print('The worst')
     response = readWaitResponse('AT+FTPLIST=1','FTPLIST:',1)
+    print('The best')
     index = response.find("1,")
+    print(index)
     if (response == 'ERROR'):
         print('FTP List Error')
-    if (index >= 0):
+    elif (index >= 0):
         code = int(response[index+2:len(response)])
         print(code)
-        if (code == 1):
+        if (code == 0):
+            print('Waiting')
+        elif (code == 1):
             print('FTP Directory List')      
             #readWaitResponse('AT+FTPLIST=2,1024','FTPLIST: 1,0',1)
-            readWaitResponse('AT+FTPLIST=2,1024','FTPLIST: 2,',1)
-            #readWait('OK',1)
-            opTime = time.time()-opTimeStart
-            print(opTime)
-            readWaitResponse('AT+FTPQUIT','FTPLIST: 1,80',1)
-            opTime = time.time()-opTimeStart
-            print(opTime)
+            response = readWaitResponse('AT+FTPLIST=2,1024','FTPLIST: 2,',2)
+            index = response.find("2,")
+            if (index > 0):
+                print(response)
+                code = int(response[index+2:len(response)])
+                print('After response')
+                print(index)
+                if (code == 0):
+                    print('Got zero')
+                    response = readWaitResponse('AT+FTPLIST=2,1024','FTPLIST: 2,',1)
+                    index = response.find("2,")
+                    code = int(response[index+2:len(response)])
+                #readWait('OK',1)
+                opTime = time.time()-opTimeStart
+                print(opTime)
+                readWaitResponse('AT+FTPQUIT','FTPLIST: 1,80',1)
+                opTime = time.time()-opTimeStart
+                print(opTime)
         elif (code == 62):
             print('FTP DNS Error')
         else:
@@ -276,7 +292,7 @@ def main():
         readResponse('AT+CBANDCFG?',0)
         readResponse('AT+COPS?',0)
         readResponse('AT+CNCFG?',0)
-        send_at('AT+CGNSPWR=0','OK',1)
+        #send_at('AT+CGNSPWR=0','OK',1)
         #readResponse('AT+CNACT=1,0',0)
         
         #readResponse('AT+CNACT=0,1',0)
@@ -290,8 +306,8 @@ def main():
         readResponse('AT+CSQ',0)
         #time.sleep(75)
         time.sleep(3)
-        readResponse('AT+CNACT?',0)
-        readResponse('AT+GSN',0)
+        #readResponse('AT+CNACT?',0)
+        #readResponse('AT+GSN',0)
         modemClock()
         modemPing()
         #modemHTTPConfig()

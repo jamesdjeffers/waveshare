@@ -71,9 +71,9 @@ String SimModem::readResponse(String command, int waitTime){
   else {
     SimModemSerial.setTimeout(modemTimeout);
   }
-  int bufferLength = SimModemSerial.readBytes(SimModemBuffer, 256);
+  int bufferLength = SimModemSerial.readBytes(buffer, 256);
   if (bufferLength){
-    String responseString = String(SimModemBuffer);
+    String responseString = String(buffer);
     responseString.trim();
     if (responseString.endsWith("OK")){
       if (bufferLength == 6){
@@ -110,10 +110,10 @@ String SimModem::readWaitResponse(String command, int waitTime, String back){
   if (waitTime){    SimModemSerial.setTimeout(waitTime);  }
   else {            SimModemSerial.setTimeout(modemTimeout);  }
 
-  int bufferLength = SimModemSerial.readBytesUntil('\n',SimModemBuffer, MODEM_BUFFER);
+  int bufferLength = SimModemSerial.readBytesUntil('\n',buffer, MODEM_BUFFER);
   while (bufferLength > 0){
-    bufferLength = SimModemSerial.readBytesUntil('\n',SimModemBuffer, MODEM_BUFFER);
-    responseString = String(SimModemBuffer);
+    bufferLength = SimModemSerial.readBytesUntil('\n',buffer, MODEM_BUFFER);
+    responseString = String(buffer);
     responseString = responseString.substring(0,bufferLength);
     int backIndex = responseString.indexOf(back);
 
@@ -140,10 +140,10 @@ String SimModem::readBurst(String command, int waitTime, String back){
   if (waitTime){    SimModemSerial.setTimeout(waitTime);  }
   else {            SimModemSerial.setTimeout(modemTimeout);  }
 
-  int bufferLength = SimModemSerial.readBytesUntil('\n',SimModemBuffer, MODEM_BUFFER);
+  int bufferLength = SimModemSerial.readBytesUntil('\n',buffer, MODEM_BUFFER);
   while (bufferLength > 0){
-    bufferLength = SimModemSerial.readBytesUntil('\n',SimModemBuffer, MODEM_BUFFER);
-    responseString = String(SimModemBuffer);
+    bufferLength = SimModemSerial.readBytesUntil('\n',buffer, MODEM_BUFFER);
+    responseString = String(buffer);
     responseString = responseString.substring(0,bufferLength);
     int backIndex = responseString.indexOf(back);
     if (backIndex >= 0){
@@ -157,14 +157,14 @@ String SimModem::readBurst(String command, int waitTime, String back){
   
   if (bytesToRead){
     
-      SimModemSerial.readBytes(SimModemBuffer, bytesToRead);
-      responseString = String(SimModemBuffer);
-      bufferLength = SimModemSerial.readBytesUntil('\n',SimModemBuffer, MODEM_BUFFER);
-      bufferLength = SimModemSerial.readBytesUntil('\n',SimModemBuffer, MODEM_BUFFER);
+      SimModemSerial.readBytes(buffer, bytesToRead);
+      responseString = String(buffer);
+      bufferLength = SimModemSerial.readBytesUntil('\n',buffer, MODEM_BUFFER);
+      bufferLength = SimModemSerial.readBytesUntil('\n',buffer, MODEM_BUFFER);
       return responseString.substring(0,bytesToRead);
     }
     else{
-      bufferLength = SimModemSerial.readBytesUntil('\n',SimModemBuffer, MODEM_BUFFER);
+      bufferLength = SimModemSerial.readBytesUntil('\n',buffer, MODEM_BUFFER);
       return "";   // Timeout occurred
     }
 
@@ -177,12 +177,12 @@ String SimModem::readBurst(String command, int waitTime, String back){
  *  Modem power pin toggles operation MUST check if device is active.
  *  Use the ATE_OFF string to enforce interface conditions
  */
- 
-void SimModem::powerToggle(){
-  digitalWrite(MODEM_POWER,HIGH);
-  delay(2000);
-  SimModemSerial.flush();
-  Serial.println("Modem toggle");
+
+void SimModem:: powerToggle(){
+  digitalWrite(MODEM_POWER, LOW);     // Value should be low already    
+  digitalWrite(MODEM_POWER, HIGH);    // Start of "ON" pulse
+  delay(1500);                        // Datasheet Ton mintues = 1.2S
+  digitalWrite(MODEM_POWER, LOW);     // Return output state to low
 }
 
 /*  "powerOn" the Modem using digital trigger
@@ -191,23 +191,20 @@ void SimModem::powerToggle(){
  *  Use the ATE_OFF string to enforce interface conditions
  */
 int SimModem::powerOn(){
-  // Check if device is on by disabling echo mode
-  String responseString = readResponse(ATE_OFF,0);
-  if(responseString != ""){
-    return 0;
-  }
-  else{
-    powerToggle();
-    delay(35000);
+  
+  if (status >= -1){
+    // Check if device is on by disabling echo mode
     SimModemSerial.flush();
-    readResponse(ATE_OFF,0);
-    responseString = readResponse(ATE_OFF,0);
+    String responseString = readResponse(ATE_OFF,0);
     if(responseString != ""){
       return 0;
     }
-    else{
-      return -1;
-    }
+  }
+  
+  // Device is not in reset, toggle IO pin and start timer
+  else{
+    status = -2;
+    powerToggle();
   }
   return 0;   // Operation occured normally
 }
@@ -223,11 +220,16 @@ int SimModem::powerOn(){
  */
 int SimModem::startSession(){
 
+  checkStatus();
+  if (status < -1){
+    return -1;
+  }
+  
   String networkStatus = readWaitResponse(AT_CGATT,0,"CGATT:");
   if (networkStatus.indexOf("1") < 0){
     // Enable the modem (do not cycle the power)
     if(powerOn()){
-      SimModemEnabled = false;
+      status = -1;
       return -1;
     }
     // From Simcom Application Note EXCEPT using PDP 1
@@ -497,7 +499,7 @@ int SimModem::ftpPut(File dataFile, int option){
         SimModemSerial.print(temp);
       }    
       delay(100);
-      SimModemSerial.readBytesUntil(':',SimModemBuffer, MODEM_BUFFER);
+      SimModemSerial.readBytesUntil(':',buffer, MODEM_BUFFER);
       SimModemSerial.flush();
     }
     if (lastPutSize){
@@ -506,7 +508,7 @@ int SimModem::ftpPut(File dataFile, int option){
         temp = dataFile.read();
         SimModemSerial.print(temp);
       }
-      SimModemSerial.readBytesUntil(':',SimModemBuffer, MODEM_BUFFER);
+      SimModemSerial.readBytesUntil(':',buffer, MODEM_BUFFER);
       SimModemSerial.flush();
     }
     responseString = readWaitResponse(AT_FTP_PDN,0,"OK");
@@ -536,7 +538,7 @@ String SimModem::ftpPut(String dataString){
       SimModemSerial.print(temp);
   }
   SimModemSerial.print('\n');
-  SimModemSerial.readBytesUntil(':',SimModemBuffer, MODEM_BUFFER);
+  SimModemSerial.readBytesUntil(':',buffer, MODEM_BUFFER);
   SimModemSerial.flush();
   
   readWaitResponse(AT_FTP_PDN,0,"OK");
@@ -582,4 +584,30 @@ String SimModem::RFOff(){
  */
 String SimModem::disableIP(){
   return readResponse(AT_NET_1OF,0);
+}
+
+int SimModem::checkStatus(){
+  if (status <= -3){
+    if ((millis() - timer) > 10000){
+      status = -1;
+      return -2;
+    }
+    else{
+      return -3;
+    }
+  }
+  else if (status == -2){
+    if ((millis() - timer) > 35000){
+      String responseString = readResponse(ATE_OFF,0);
+      if (responseString != "") {
+        status = 0;
+        return 0;
+      }
+      return -1;
+    }
+    return -2;
+  }
+  else {
+    return (int)status;
+  }
 }

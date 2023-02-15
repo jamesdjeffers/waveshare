@@ -39,6 +39,7 @@ class GPSSerial
   public:
     GPSSerial();
     int init();
+    String readRaw();
     String readResponse();
     
     float lng();

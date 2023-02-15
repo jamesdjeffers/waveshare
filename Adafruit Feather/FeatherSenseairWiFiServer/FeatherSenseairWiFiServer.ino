@@ -32,6 +32,7 @@
   License along with this library; if not, write to the Free Software
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
+#include "secrets.h"
 
 #include "k96Modbus.h"
 #include "Airlift.h"
@@ -44,7 +45,7 @@
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 
-#define SW_VER_NUM          "0.4"
+#define SW_VER_NUM          "0.6"
 
 #define INTERVAL_DATA_MAX   900000
 #define INTERVAL_DATA_MIN   20000
@@ -61,13 +62,13 @@
 
 String dataString = "";
 
-int intervalData = 20000;           // Read data from sensor and GPS every 30 seconds
+int intervalData = 0;           // Read data from sensor and GPS every 30 seconds
 int LastRead = 0;                   // Millisecond timer value for last data read
-int updateDelay = 120000;           // Write most recent data to FTP server every 3 minutes
+int updateDelay = 0;          //120000          // Write most recent data to FTP server every 3 minutes
 int LastDataUpload = 0;             // Millisecond timer value for last data upload
 int intervalCfg = 0;                // Read timing configuration by FTP every 3 minutes
 int timerLastCfg = 0;
-int intervalBackup = 90000000;      // Backup the data file every 15 minutes
+int intervalBackup = 0;      // Backup the data file every 15 minutes
 int LastFileUpload = 0;
 int lastFTPByteBackup = 0;
 int intervalLog = 0;                // Update the system event log every 60 minutes
@@ -110,41 +111,40 @@ void setup() {
   //Initialize serial and wait for port to open:
   Serial.begin(115200);
 
-  // Device 1: SD card, disable if using Feather WiFi (set status = -1)
-  statusSD = logger.init();
-  if (!statusSD){
-    logger.fileRemove(1);
-    logger.logNewName();
-    logger.fileAddCSV("**********************************************",2);
-    logger.fileAddCSV(("Firmware v0.3, Settings: " + settingsString()),2);
-  }
-  
-  // Device 2: Modem
-  statusModem = modem.init();
-  // Optional internal clock if modem is not present
-  if (statusModem){
-    timeClient.begin();
-    if (!statusSD) logger.fileAddCSV("Modem not present",2);
-  }
-  else{
-    if (!statusSD){
-      logger.fileAddCSV((modem.readClock(0)+": modem initialized"),2);
-    }
+  // Device 3: GPS sensor
+  statusGPS = gpsSerial.init();
+  while (1){
+    Serial.println(gpsSerial.readRaw());
   }
 
-  // Create open network. Change this line if you want to create an WEP network:
-  statusWifi = airliftInit();
+  /* Device 1: WiFi Server 1111111111111111111111111111111111111111111111111111111*/
+  //statusWifi = airliftInit();
+  
   if (!statusWifi){
     if (!statusSD) logger.fileAddCSV((modem.readClock(0)+": WiFi server created"),2);
   }
   else{
     if (!statusSD) logger.fileAddCSV((modem.readClock(0)+": WiFi not present"),2);
   }
-    
-  /* Initialise the sensor */
-  statusSensor = k96.init();
-  if (!statusSensor){
-    logger.fileAddCSV((modem.readClock(0)+": K96 Sensor = " + k96.readSensorID()+" Firmware = " + k96.readSensorFW()),2);
+
+  /* Device 2: Modem 2222222222222222222222222222222222222222222222222222222222222*/
+  statusModem = modem.init();
+  // Optional internal clock if modem is not present
+  if (statusModem){
+    //if (statusWifi) timeClient.begin();
+    logger.fileAddCSV("Modem not present",2);
+  }
+  else{
+    logger.fileAddCSV((modem.readClock(0)+": modem initialized"),2);
+  }
+
+  // Device 4: SD card, disable if using Feather WiFi (set status = -1)
+  statusSD = logger.init();
+  if (!statusSD){
+    logger.fileRemove(1);
+    logger.logNewName();
+    logger.fileAddCSV("**********************************************",2);
+    logger.fileAddCSV(("Firmware v0.3, Settings: " + settingsString()),2);
   }
   
   // Device 3: GPS sensor
@@ -160,6 +160,12 @@ void setup() {
   if (!statusSD){
     logger.fileNewName(modem.readClock(1));
     logger.fileAddCSV((modem.readClock(0)+": Data acquisition file = " + logger.fileNameString()),2);
+  }
+
+  /* Device 1: Chemical sensor 11111111111111111111111111111111111111111111111111111111111111*/
+  statusSensor = k96.init();
+  if (!statusSensor){
+    logger.fileAddCSV((modem.readClock(0)+": K96 Sensor = " + k96.readSensorID()+" Firmware = " + k96.readSensorFW()),2);
   }
 
   // Completed startup, with internet connection store system log with FTP
@@ -390,11 +396,6 @@ void loop() {
       Serial.println(modem.echoOff());
     }
     
-    else if (serialCommand == "t"){
-      Serial.println("Serial Command = t");
-      modem.powerToggle();
-
-    }
     else if (serialCommand == "q"){
       Serial.print("Simcom 7070G 4G Signal = ");
       Serial.println(modem.readSignal());      
@@ -412,13 +413,14 @@ void loop() {
       Serial.println(modem.readClock(0));
     }
     
-    else if (serialCommand == "z"){
+    else if (serialCommand == "init"){
       Serial.print("Simcom 7070G Reset ");
       Serial.println(modem.init());
     }
-    else if (serialCommand == "o"){
-      Serial.print("Simcom 7070G Power On ");
-      Serial.println(modem.powerOn());
+    
+    else if (serialCommand == "power"){
+      Serial.println("Simcom 7070G Power Toggle");
+      modem.powerToggle();
     }
     
     else if (serialCommand == "i"){
@@ -429,11 +431,7 @@ void loop() {
       Serial.print("Simcom 7070G IP Ping = ");
       Serial.println(modem.readIPPing());
     }
-    else if (serialCommand == "w"){
-      //gps.encode(modem.readGPS());
-      Serial.print("GPS Serial Time = ");
-      Serial.println(String(gps.time.hour())+':'+String(gps.time.minute())+':'+String(gps.time.second()));
-    }
+    
     else if (serialCommand == "1"){
       Serial.print("Simcom 7070G Disabled = ");
       Serial.println(modem.GPSOff());
@@ -462,6 +460,22 @@ void loop() {
       Serial.println("Simcom 7070G FTP Reset ");
       Serial.println(modem.startFTP());
     }
+
+    //*********************************************************************************
+    // GPS Commands
+    else if (serialCommand == "gps"){
+      Serial.print("GPS Serial Value = ");
+      Serial.println(gpsSerial.readResponse());
+    }
+    else if (serialCommand == "gps_raw"){
+      Serial.print("GPS Serial Value = ");
+      Serial.println(gpsSerial.readRaw());
+    }
+    else if (serialCommand == "gps_time"){
+      //gps.encode(modem.readGPS());
+      Serial.print("GPS Serial Time = ");
+      Serial.println(String(gps.time.hour())+':'+String(gps.time.minute())+':'+String(gps.time.second()));
+    }
     
   }
 
@@ -474,7 +488,7 @@ void loop() {
     LastRead = millis();
     int option = (updateDelay != 0);
     if (statusModem){
-      dataString = timeClient.getFormattedTime()+',';
+      dataString = "99/12/31,"+ timeClient.getFormattedTime() + ',';
     }
     else{
       dataString = modem.readClock(0)+',';
@@ -551,7 +565,7 @@ void loop() {
       }
       //BACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUP
       // Upload the dated CSV file
-      else if (((millis()-LastFileUpload) > intervalBackup) || fileSizeLimit){
+      else if (((intervalBackup && (millis()-LastFileUpload) > intervalBackup)) || fileSizeLimit){
         
         File tempFile = logger.fileOpen(0);
         tempFile.seek(lastFTPByteBackup);
@@ -582,20 +596,14 @@ void loop() {
         modem.disableIP();
         delay(1000);
         modem.powerToggle();
-        Serial.println("Wait");
-        delay(14000);
+        Serial.println("PowerOFF");
         modem.powerToggle();
-        //statusFTP = 0;
-        Serial.println("Modem done");
-        //delay(50000);
-        //Serial.println("100 seconds");
-        modem.powerOn();
-        Serial.println("Modem on");
+        Serial.println("PowerON");
       }
       //POWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWER
       // If sufficient delay until next modem action, disable network connection
       if (updateDelay >= 45000){
-        Serial.println("Power manage");
+        Serial.println("File Updated");
         //modem.disableIP();
       }
   }    

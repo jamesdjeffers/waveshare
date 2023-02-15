@@ -56,6 +56,21 @@ int GPSSerial::init(){
  *  Return latitude, longitude, elevation, and UTC timein CSV string
  */
  
+String GPSSerial::readRaw(){
+  
+  String temp;
+  while (mySerial.available() > 0){
+    temp += String(mySerial.read());
+  }
+  
+  return temp;
+}
+
+/*
+ *  Read the serial port streaminto the parser
+ *  Return latitude, longitude, elevation, and UTC timein CSV string
+ */
+ 
 String GPSSerial::readResponse(){
   
   while (mySerial.available() > 0){

@@ -25,7 +25,8 @@ DataLogger::DataLogger(){
 
 int DataLogger::init(){
     // see if the card is present and can be initialized:
-  return !SD.begin(SD_CS);
+  status = !SD.begin(SD_CS);
+  return status;
 }
 
 int DataLogger::fileDump(int option){
@@ -64,14 +65,17 @@ int DataLogger::fileDump(int option){
 int DataLogger::fileRemove(int option){
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
-  String file = fileName;
-  if (option) file = TEMP_DATA;
-  if (SD.exists(file)) {
-    SD.remove(file);
-    return 0;
-  } else {
-    return -1;
+  if (!status){
+    String file = fileName;
+    if (option) file = TEMP_DATA;
+    if (SD.exists(file)) {
+      SD.remove(file);
+      return 0;
+    } else {
+      return -1;
+    }
   }
+  return -1; 
 }
 
 /*
@@ -80,30 +84,34 @@ int DataLogger::fileRemove(int option){
 void DataLogger::fileRemoveAll(){
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
-  File root;
-  root = SD.open("/");
-  while (true) {
-
-    File entry =  root.openNextFile();
-    if (! entry) {
-      // no more files
-      break;
+  if (!status){
+    File root;
+    root = SD.open("/");
+    while (true) {
+  
+      File entry =  root.openNextFile();
+      if (! entry) {
+        // no more files
+        break;
+      }
+      SD.remove(entry.name());
+      entry.close();
     }
-    SD.remove(entry.name());
-    entry.close();
+    root.close();
   }
-  root.close();
-
 }
 
 /*
  * Check the size of the current data file
  */
 int DataLogger::fileCheckSize(){
-  File dataFile = SD.open(fileName);
-  int fileSize = dataFile.size();
-  dataFile.close();
-  return fileSize;
+  if (!status){
+    File dataFile = SD.open(fileName);
+    int fileSize = dataFile.size();
+    dataFile.close();
+    return fileSize;
+  }
+  return -1;
 }
 
 /*
@@ -112,8 +120,9 @@ int DataLogger::fileCheckSize(){
 int DataLogger::fileAddCSV(String csvString, int option){
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
+  if (!status){
     File dataFile;
-    
+
     // if the file is available, write to it, else log error
     if (option <= 1) {
       dataFile = SD.open(fileName, FILE_WRITE);
@@ -142,6 +151,8 @@ int DataLogger::fileAddCSV(String csvString, int option){
       }
     }
     return 1;
+  }
+  return -1;    
 }
 
 /*
@@ -149,27 +160,30 @@ int DataLogger::fileAddCSV(String csvString, int option){
  */
 
 void DataLogger::fileDir(File dir, int numTabs) {
-  while (true) {
 
-    File entry =  dir.openNextFile();
-    if (! entry) {
-      // no more files
-      break;
+  if (!status){
+    while (true) {
+
+      File entry =  dir.openNextFile();
+      if (! entry) {
+        // no more files
+        break;
+      }
+      for (uint8_t i = 0; i < numTabs; i++) {
+        Serial.print('\t');
+      }
+      Serial.print(entry.name());
+      if (entry.isDirectory()) {
+        Serial.println("/");
+        fileDir(entry, numTabs + 1);
+      } else {
+        // files have sizes, directories do not
+        Serial.print("\t\t");
+        Serial.println(entry.size(), DEC);
+      }
+      entry.close();
     }
-    for (uint8_t i = 0; i < numTabs; i++) {
-      Serial.print('\t');
-    }
-    Serial.print(entry.name());
-    if (entry.isDirectory()) {
-      Serial.println("/");
-      fileDir(entry, numTabs + 1);
-    } else {
-      // files have sizes, directories do not
-      Serial.print("\t\t");
-      Serial.println(entry.size(), DEC);
-    }
-    entry.close();
-  }
+  }  
 }
 
 /*
@@ -178,17 +192,20 @@ void DataLogger::fileDir(File dir, int numTabs) {
 int DataLogger::fileCount(File dir){
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
-  int numFiles = 0;
-  while (true) {
-
-    File entry =  dir.openNextFile();
-    if (! entry) {
-      // no more files
-      return numFiles;
+  if (!status){
+    int numFiles = 0;
+    while (true) {
+  
+      File entry =  dir.openNextFile();
+      if (! entry) {
+        // no more files
+        return numFiles;
+      }
+      numFiles+=1;
+      entry.close();
     }
-    numFiles+=1;
-    entry.close();
   }
+  return -1;
 }
 
 /*
@@ -263,7 +280,7 @@ void DataLogger::logNewName(){
 File DataLogger::fileOpen(int option){
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
-  
+  if (!status){
     if (option == 1){
       return SD.open(TEMP_DATA);
     }
@@ -273,5 +290,10 @@ File DataLogger::fileOpen(int option){
     else{
       return SD.open(fileName);
     }
+  }
+  else {
+    File temp;
+    return temp;
+  }
     
 }

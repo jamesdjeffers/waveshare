@@ -52,18 +52,18 @@
 #define AT_NET_1OF "AT+CNACT=1,0"
 
 #define AT_NTP_ID  "AT+CNTPCID=1"                    // ADP Configuration query
-#define AT_NTP_SET "AT+CNTP=\"time.nist.gov\",-20"    // NIST server, Time Zone
+#define AT_NTP_SET "AT+CNTP=\"time.nist.gov\",-24"    // NIST server, Time Zone
 #define AT_NTP_UP  "AT+CNTP"                        // Update the NTP server
 #define AT_TIME    "AT+CCLK?"                       // Dat and Time string query 
 
 #define AT_SNPDPID "AT_SNPDPID=1"
-#define AT_IP_PING "AT+SNPING4=\"ftp.weng.oucreate.com\",1,16,1000"
+#define AT_IP_PING IP_PING
 
 #define AT_FTP_EXT "AT+FTPQUIT"
 #define AT_FTP_CID "AT+FTPCID=1"
-#define AT_FTP_SRV "AT+FTPSERV=\"\""
-#define AT_FTP_UN  "AT+FTPUN=\"\""
-#define AT_FTP_PWD "AT+FTPPW=\"\""
+#define AT_FTP_SRV FTP_SERVER
+#define AT_FTP_UN  FTP_UN
+#define AT_FTP_PWD FTP_PWD
 #define AT_FTP_PRT "AT+FTPPORT=21"
 #define AT_FTP_TYP "AT+FTPTYPE=\"I\""
 
@@ -88,6 +88,7 @@
 #define AT_GPS_OFF "AT+CGNSPWR=0"
 #define AT_GPS_RD  "AT+CGNSINF"
 
+#include "secrets.h"
 #include <Arduino.h>        // required before wiring_private.h
 #include "wiring_private.h" // pinPeripheral() function
 #include <SD.h>
@@ -96,18 +97,22 @@ class SimModem
 {
 private:
   
-  char SimModemBuffer [1360] = "";
-  bool SimModemEnabled = false;
+  char buffer [1360] = "";
+  int status = -3;                    // Contains operation mode data (-3 = unknown, -2 = startup, -1 = connecting, 0 = on)
+  long timer = 0;                     // Used to track internal actions, stores millisecond timer
   
 public:
-  SimModem();
-  int init();
+  SimModem();                         // Constructor
+  int init();                         // Start serial communication, reset device
+  
   void powerToggle();
   int powerOn();
   int startSession();
+  int checkStatus();
   
-  int startNTP();
-  int startFTP();
+  int startNTP();                    // Internal time clock server
+  int startFTP();                    // Data server initialization
+  
   // Parses the entire strings received from modem
   String readResponse(String command, int waitTime);
   String readWaitResponse(String command, int waitTime, String back);
