@@ -83,9 +83,9 @@ String SimModem::readResponse(String command, int waitTime){
         return responseString.substring(0,bufferLength-2);
       }
     }
-    else if (responseString.startsWith("Error")){
-      return "Error";
-    }
+//    else if (responseString.startsWith("Error")){
+//      return "Error";
+//    }
     else {
       return responseString.substring(0,responseString.indexOf('\n',1));
     }
@@ -134,7 +134,7 @@ String SimModem::readBurst(String command, int waitTime, String back){
    String responseString = "";
    int bytesToRead = 0;
   
-  SimModemSerial.flush();
+  //SimModemSerial.flush();
   SimModemSerial.println(command);
 
   if (waitTime){    SimModemSerial.setTimeout(waitTime);  }
@@ -274,13 +274,26 @@ int SimModem::startNTP(){
  */
 int SimModem::startFTP(){
   
+  String responseString;
   // From Simcom Application Note EXCEPT using PDP 1
-  readResponse(AT_FTP_EXT,0);
-  readResponse(AT_FTP_CID,0);
-  readResponse(AT_FTP_SRV,0);
-  readResponse(AT_FTP_UN,0);
-  readResponse(AT_FTP_PWD,0);
-  readResponse(AT_FTP_PRT,0);
+  responseString = readResponse(AT_FTP_EXT,100);
+  Serial.println(responseString);
+  delay(100);
+  responseString = readResponse(AT_FTP_CID,100);
+  Serial.println(responseString);
+  delay(100);
+  responseString = readResponse(AT_FTP_SRV,100);
+  Serial.println(responseString);
+  delay(100);
+  responseString = readResponse(AT_FTP_UN,100);
+  Serial.println(responseString);
+  delay(100);
+  responseString = readResponse(AT_FTP_PWD,100);
+  Serial.println(responseString);
+  delay(100);
+  responseString = readResponse(AT_FTP_PRT,100);
+  Serial.println(responseString);
+  delay(100);
 
   readResponse(AT_FTP_GET_NAM,0);
   readResponse(AT_FTP_GET_PTH,0);
@@ -405,16 +418,17 @@ String SimModem::ftpList(){
 
   String responseString;
   // Check if the modem has internet connection
-  if (!startSession()){
+  if (true){
     Serial.println("Configuring FTP");
-    startFTP();
+    //startFTP();
     Serial.println("Requesting FTP list");
     responseString = readWaitResponse(AT_FTP_LST,5000,"FTPLIST:");
 
     if (responseString.indexOf("1,1") >= 0){
       Serial.println("Reading FTP list");
-      Serial.println(readBurst(AT_FTP_LRD,5000,"FTPLIST:"));
+      Serial.println(readBurst(AT_FTP_LRD,1000,"FTPLIST:"));
     }
+    Serial.println(responseString);
     readWaitResponse(AT_FTP_EXT,3000,"FTPLIST: 1,80");
     return "Done";
   }
@@ -584,6 +598,38 @@ String SimModem::RFOff(){
  */
 String SimModem::disableIP(){
   return readResponse(AT_NET_1OF,0);
+}
+
+/*
+ * GPS Enabled
+ * Simcom 7070G cannot operate GPS and modem at same time
+ */
+String SimModem::ftpCID(){
+  return readResponse(AT_FTP_CID,100);
+}
+
+/*
+ * GPS Enabled
+ * Simcom 7070G cannot operate GPS and modem at same time
+ */
+String SimModem::ftpUsername(){
+  return readResponse(AT_FTP_UN,100);
+}
+
+/*
+ * GPS Enabled
+ * Simcom 7070G cannot operate GPS and modem at same time
+ */
+String SimModem::ftpPwd(){
+  return readResponse(AT_FTP_PWD,100);
+}
+
+/*
+ * GPS Enabled
+ * Simcom 7070G cannot operate GPS and modem at same time
+ */
+String SimModem::ftpServer(){
+  return readResponse(AT_FTP_SRV,100);
 }
 
 int SimModem::checkStatus(){

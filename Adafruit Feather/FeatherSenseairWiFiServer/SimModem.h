@@ -61,7 +61,7 @@
 
 #define AT_FTP_EXT "AT+FTPQUIT"
 #define AT_FTP_CID "AT+FTPCID=1"
-#define AT_FTP_SRV FTP_SERVER
+#define AT_FTP_SRV FTP_SRV
 #define AT_FTP_UN  FTP_UN
 #define AT_FTP_PWD FTP_PWD
 #define AT_FTP_PRT "AT+FTPPORT=21"
@@ -142,6 +142,11 @@ public:
   
   String ftpPut(String dataString);
   int ftpPut(File dataFile, int option);
+
+  String ftpCID();
+  String ftpUsername();
+  String ftpPwd();
+  String ftpServer();
 
   String GPSOn();
   String GPSOff();

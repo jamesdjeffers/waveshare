@@ -44,7 +44,9 @@ class GPSSerial
     
     float lng();
     float lat();
-    String time();    
+    
+    String time();
+    String date();    
 };
 
 #endif

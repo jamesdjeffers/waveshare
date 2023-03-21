@@ -40,11 +40,6 @@
 #include "DataLogger.h"
 #include "GPSSerial.h"
 
-#include <TinyGPS++.h>
-
-#include <NTPClient.h>
-#include <WiFiUdp.h>
-
 #define SW_VER_NUM          "0.6"
 
 #define INTERVAL_DATA_MAX   900000
@@ -87,15 +82,6 @@ bool fileSizeLimit = false;
 GPSSerial gpsSerial;
 int statusGPS = -1;
 
-// GPS string conversion object
-TinyGPSPlus gps;
-
-// Time stamp updates, requires WiFi connection can be used internal time clock
-WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP,"pool.ntp.org", 36000, 60000);
-bool NTPEnabled = false;
-
-
 // Serial port parser
 char serialBuffer[SERIAL_BUFFER] = "";
 /*********************************************************************************************
@@ -110,12 +96,6 @@ char serialBuffer[SERIAL_BUFFER] = "";
 void setup() {
   //Initialize serial and wait for port to open:
   Serial.begin(115200);
-
-  // Device 3: GPS sensor
-  statusGPS = gpsSerial.init();
-  while (1){
-    Serial.println(gpsSerial.readRaw());
-  }
 
   /* Device 1: WiFi Server 1111111111111111111111111111111111111111111111111111111*/
   //statusWifi = airliftInit();
@@ -241,11 +221,11 @@ void loop() {
               client.print("<br><br>GPS Serial Device <a href=\"/GPSON\">ON</a> ");
               client.print("Click <a href=\"/GPSOFF\">OFF</a><br>");
               client.print("<br>Latitude = ");
-              client.print(String(gps.location.lat()));
+              client.print(String(gpsSerial.lat()));
               client.print("<br>Longitude = ");
-              client.print(String(gps.location.lng()));
+              client.print(String(gpsSerial.lng()));
               client.print("<br>Time = ");
-              client.print(String(gps.time.hour())+':'+String(gps.time.minute())+':'+String(gps.time.second()));
+              client.print(String(gpsSerial.time()));
   
               client.print("<br><br>Sim Modem <a href=\"/MODEMINIT\">ON</a> ");
               client.print("Click <a href=\"/MODEMOFF\">OFF</a><br>");
@@ -289,9 +269,7 @@ void loop() {
           if (currentLine.endsWith("GET /DELAY3")) {
             intervalData = 30000;                // GET /L turns the LED off
           }
-          if (currentLine.endsWith("GET /NTP")) {
-            timeClient.update();                // GET /L turns the LED off
-          }
+          
           // Check to see if the client request was GPS related
           if (currentLine.endsWith("GET /GPSON")) {
             if (statusGPS){
@@ -333,7 +311,7 @@ void loop() {
     serialCommand = serialCommand.substring(0,serialDataSize);
     
     if (serialCommand == "d"){
-      Serial.print(dataString);
+      Serial.println(dataString);
     }
     else if (serialCommand.startsWith("d=")){
       intervalData = serialCommand.substring(2,serialDataSize).toInt();
@@ -372,10 +350,7 @@ void loop() {
       Serial.println(updateDelay);
       logger.fileAddCSV((modem.readClock(0)+": FTP Upload Delay = " + String(updateDelay)),2);
     }
-    else if (serialCommand == "a"){
-      Serial.print("Simcom 7070G FTP List = ");
-      Serial.println(modem.ftpList());
-    }
+    
     else if (serialCommand == "u"){
       Serial.print("Simcom 7070G FTP Get = ");
       updateConfig();
@@ -456,9 +431,31 @@ void loop() {
       Serial.println("Simcom 7070G Network Activated = ");
       Serial.println(modem.enableIP());
     }
-    else if (serialCommand == "7"){
+    //********************************************************************************
+    // FTP Commands
+    else if (serialCommand == "ftp start"){
       Serial.println("Simcom 7070G FTP Reset ");
       Serial.println(modem.startFTP());
+    }
+    else if (serialCommand == "ftp ls"){
+      Serial.print("Simcom 7070G FTP List = ");
+      Serial.println(modem.ftpList());
+    }
+    else if (serialCommand == "ftp un"){
+      Serial.print("Simcom 7070G FTP Set Username = ");
+      Serial.println(modem.ftpUsername());
+    }
+    else if (serialCommand == "ftp id"){
+      Serial.print("Simcom 7070G FTP Set CID = ");
+      Serial.println(modem.ftpCID());
+    }
+    else if (serialCommand == "ftp pwd"){
+      Serial.print("Simcom 7070G FTP Set Password = ");
+      Serial.println(modem.ftpPwd());
+    }
+    else if (serialCommand == "ftp server"){
+      Serial.print("Simcom 7070G FTP Set Server = ");
+      Serial.println(modem.ftpCID());
     }
 
     //*********************************************************************************
@@ -474,28 +471,36 @@ void loop() {
     else if (serialCommand == "gps_time"){
       //gps.encode(modem.readGPS());
       Serial.print("GPS Serial Time = ");
-      Serial.println(String(gps.time.hour())+':'+String(gps.time.minute())+':'+String(gps.time.second()));
+      Serial.println(gpsSerial.time());
     }
     
   }
 
-  if (NTPEnabled){
-    timeClient.update();
-  }
+/*
+ * Data processing loop - create comma separated value string
+ * 
+ * 1 - Date
+ * 2 - Time
+ * 3 - CH4 concentration
+ * 4 - CO2 concentration
+ * 5 - H2O concentration
+ */
   
   if ((millis()-LastRead) > intervalData){
     
     LastRead = millis();
     int option = (updateDelay != 0);
+
+    // First two elements are date and time
     if (statusModem){
-      dataString = "99/12/31,"+ timeClient.getFormattedTime() + ',';
+      dataString = gpsSerial.date() + ',' + gpsSerial.time() + ',';
     }
     else{
       dataString = modem.readClock(0)+',';
     }
     
-    dataString += k96.readCSVString();
-    dataString += gpsSerial.readResponse();
+    dataString += k96.readCSVString();                              // Sensor data
+    dataString += gpsSerial.readResponse();                         // GPS data
   
     if(!statusSD){
       statusSD = logger.fileAddCSV(dataString, option);

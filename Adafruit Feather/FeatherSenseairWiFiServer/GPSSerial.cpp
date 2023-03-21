@@ -43,6 +43,7 @@ int GPSSerial::init(){
   mySerial.setTimeout(GPS_TIMEOUT);
   pinPeripheral(GPS_RX, PIO_SERCOM); //Assign RX function to pin 11
   pinPeripheral(GPS_TX, PIO_SERCOM); //Assign TX function to pin 10
+  delay(500);
   if (mySerial.available() > 0){
     return 0;
   }
@@ -99,4 +100,8 @@ float GPSSerial::lng(){
 
 String GPSSerial::time(){
   return (String(gps.time.hour())+':'+String(gps.time.minute())+':'+String(gps.time.second()));
+}
+
+String GPSSerial::date(){
+  return (String(gps.date.year())+'/'+String(gps.date.month())+'/'+String(gps.date.day()));
 }
