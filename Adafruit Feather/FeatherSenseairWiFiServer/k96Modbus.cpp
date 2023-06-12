@@ -18,6 +18,17 @@
 */
 #include "k96Modbus.h"
 
+#if BOARD == 0
+  Uart sensorSerial (&sercom1, K96_TX, K96_RX, SERCOM_RX_PAD_0, UART_TX_PAD_2);
+  void SERCOM1_Handler(){
+    sensorSerial.IrqHandler();
+  }
+#elif BOARD == 1
+  #define sensorSerial Serial1
+#elif BOARD == 2
+  #define sensorSerial Serial1
+#endif
+
 k96Modbus::k96Modbus()
 {
 }
@@ -27,8 +38,13 @@ k96Modbus::k96Modbus()
  * Baud Rate = 115200, Parity = None, Stop bits = 2
  */
 int k96Modbus::init(){
-  Serial1.begin(K96_BAUD,SERIAL_8N2);
-  Serial1.setTimeout(K96_TIMEOUT);
+  
+  sensorSerial.begin(K96_BAUD,SERIAL_8N2);
+  sensorSerial.setTimeout(K96_TIMEOUT);
+  if (BOARD == 0){
+    pinPeripheral(K96_TX, PIO_SERCOM); //Assign RX function to pin 11
+    pinPeripheral(K96_RX, PIO_SERCOM); //Assign TX function to pin 10
+  }
   pinMode(K96_POWER,OUTPUT);
   digitalWrite(K96_POWER,HIGH);
   return 0;
@@ -63,19 +79,19 @@ long k96Modbus::longConvert(byte highest, byte higher, byte lower, byte lowest){
  */
 int k96Modbus::readResponse(){
   byte test[8];
-  Serial1.readBytes(test,8);
+  sensorSerial.readBytes(test,8);
   return wordU16(test[3],test[4]);
 }
 
 long k96Modbus::readResponseLong(){
   byte test[10];
-  Serial1.readBytes(test,10);
+  sensorSerial.readBytes(test,10);
   return longConvert(test[3],test[4],test[5],test[6]);
 }
 
 int k96Modbus::readResponse(int numBytes){
   byte test[6+numBytes];
-  int responseBytes = Serial1.readBytes(test,6+numBytes);
+  int responseBytes = sensorSerial.readBytes(test,6+numBytes);
   k96_memory[0] = wordS16(test[3],test[4]);
   k96_memory[1] = wordS16(test[5],test[6]);
   k96_memory[2] = wordS16(test[7],test[8]);
@@ -87,7 +103,7 @@ int k96Modbus::readResponse(int numBytes){
 
 void k96Modbus::writeCommand(int byteAddress){
   for(int i=0; i<7; i++){
-    Serial1.write(command[i+7*byteAddress]);
+    sensorSerial.write(command[i+7*byteAddress]);
   }
 }
 
@@ -110,7 +126,7 @@ String k96Modbus::readCSVString(){
     return dataString;
   }
   else{
-    return "-,-,-,-,-,-,-,-,-,-,";
+    return "bytes,"+String(readStatus)+",-,-,-,-,-,-,-,-,";
   }
   
 }
@@ -133,6 +149,6 @@ String k96Modbus::readSensorID(){
 String k96Modbus::readSensorFW(){
   byte test[10];
   writeCommand(6);
-  Serial1.readBytes(test,10);
+  sensorSerial.readBytes(test,10);
   return (String(test[3])+"."+String(test[4]) +"."+ String(test[5]) +"."+ String(test[6]));
 }

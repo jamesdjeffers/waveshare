@@ -21,9 +21,9 @@
 */
 #include "GPSSerial.h"
 
-Uart mySerial (&sercom2, GPS_RX, GPS_TX, SERCOM_RX_PAD_3, UART_TX_PAD_0);
+Uart gps2Serial (&sercom2, GPS_RX, GPS_TX, SERCOM_RX_PAD_3, UART_TX_PAD_0);
 void SERCOM2_Handler(){
-  mySerial.IrqHandler();
+  gps2Serial.IrqHandler();
 }
 
 // Constructor
@@ -39,12 +39,12 @@ GPSSerial::GPSSerial()
 
 int GPSSerial::init(){
   
-  mySerial.begin(GPS_BAUD);
-  mySerial.setTimeout(GPS_TIMEOUT);
+  gps2Serial.begin(GPS_BAUD);
+  gps2Serial.setTimeout(GPS_TIMEOUT);
   pinPeripheral(GPS_RX, PIO_SERCOM); //Assign RX function to pin 11
   pinPeripheral(GPS_TX, PIO_SERCOM); //Assign TX function to pin 10
   delay(500);
-  if (mySerial.available() > 0){
+  if (gps2Serial.available() > 0){
     return 0;
   }
   else{
@@ -60,8 +60,8 @@ int GPSSerial::init(){
 String GPSSerial::readRaw(){
   
   String temp;
-  while (mySerial.available() > 0){
-    temp += String(mySerial.read());
+  while (gps2Serial.available() > 0){
+    temp += String(gps2Serial.read());
   }
   
   return temp;
@@ -74,8 +74,8 @@ String GPSSerial::readRaw(){
  
 String GPSSerial::readResponse(){
   
-  while (mySerial.available() > 0){
-    gps.encode(mySerial.read());
+  while (gps2Serial.available() > 0){
+    gps.encode(gps2Serial.read());
   }
   
   return (String(gps.location.rawLat().deg) + '.' + String(gps.location.rawLat().billionths)+','

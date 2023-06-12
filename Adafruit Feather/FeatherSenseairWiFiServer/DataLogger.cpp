@@ -129,11 +129,12 @@ int DataLogger::fileAddCSV(String csvString, int option){
       if (dataFile) {
         dataFile.println(csvString);
         dataFile.close();
+        return 0;
       }
     }
     
     if (option == 1){
-      dataFile = SD.open(TEMP_DATA, FILE_WRITE);
+      dataFile = SD.open(fileName, FILE_WRITE);
       // if the file is available, write to it, else log error
       if (dataFile) {
         dataFile.println(csvString);

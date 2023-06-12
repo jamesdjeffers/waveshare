@@ -26,12 +26,27 @@
 #ifndef k96Modbus_h
 #define k96Modbus_h
 
-#define K96_BAUD      115200
-#define K96_TIMEOUT   200
+#define K96_BAUD        115200
+#define K96_TIMEOUT     200
 
-#define K96_POWER     A0            // Device enable pin
+#define BOARD               0
 
-#include <Arduino.h>
+#if BOARD == 0
+  #define K96_POWER      5      // Device enable pin
+  #define K96_TX        11      // Sercom1 receive pin
+  #define K96_RX        10      // Sercom1 transmit pin
+#elif BOARD == 1
+  #define K96_POWER     A0      // Device enable pin
+  #define K96_TX         0      // Sercom1 receive pin
+  #define K96_RX         1      // Sercom1 transmit pin
+#elif BOARD == 2
+  #define K96_POWER     A0      // Device enable pin
+  #define K96_TX         0      // Sercom1 receive pin
+  #define K96_RX         1      // Sercom1 transmit pin
+#endif
+
+#include <Arduino.h>            // required before wiring_private.h
+#include "wiring_private.h"     // pinPeripheral() function
 
 class k96Modbus
 {

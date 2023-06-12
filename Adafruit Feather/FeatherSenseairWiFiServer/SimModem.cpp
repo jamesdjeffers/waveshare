@@ -183,6 +183,11 @@ void SimModem:: powerToggle(){
   digitalWrite(MODEM_POWER, HIGH);    // Start of "ON" pulse
   delay(1500);                        // Datasheet Ton mintues = 1.2S
   digitalWrite(MODEM_POWER, LOW);     // Return output state to low
+  
+  String responseString = readResponse(ATE_OFF,0);
+  while (responseString.indexOf("NORMAL") >= 0 | responseString.indexOf("OK") != 0){
+    responseString = readResponse(ATE_OFF,0);
+  }
 }
 
 /*  "powerOn" the Modem using digital trigger
@@ -414,6 +419,18 @@ String SimModem::echoOff(){
 /*
  * FTP directory read operation
  */
+void SimModem::ftpFileName(int type){
+  switch(type){
+    case 0:
+      readResponse(AT_FTP_GET_NAM,0);
+    case 1:
+      readResponse(AT_FTP_GET_NAM,0);
+  }
+}
+
+/*
+ * FTP directory read operation
+ */
 String SimModem::ftpList(){
 
   String responseString;
@@ -442,14 +459,7 @@ String SimModem::ftpList(){
 String SimModem::ftpGet(){
   
   String responseString = readWaitResponse(AT_FTP_GET,5000,"FTPGET:");
-  if (responseString.indexOf("1,1") < 0){
-    int modem = startSession();
-    if (modem < 0){
-      return "ERROR_62";
-    }
-    startFTP();
-    responseString = readWaitResponse(AT_FTP_GET,5000,"FTPGET:");
-  }
+
   if (responseString.indexOf("1,1") >= 0){
     String file = readBurst(AT_FTP_GRD,5000,"FTPGET:");
     readWaitResponse(AT_FTP_EXT,1000,"FTPGET: 1,80");

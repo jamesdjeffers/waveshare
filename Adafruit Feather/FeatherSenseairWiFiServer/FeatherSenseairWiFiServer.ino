@@ -32,15 +32,15 @@
   License along with this library; if not, write to the Free Software
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
+
+#define SW_VER_NUM          "Firmware v0.7"
 #include "secrets.h"
 
 #include "k96Modbus.h"
-#include "Airlift.h"
+#include "WifiData.h"
 #include "SimModem.h"
 #include "DataLogger.h"
 #include "GPSSerial.h"
-
-#define SW_VER_NUM          "0.6"
 
 #define INTERVAL_DATA_MAX   900000
 #define INTERVAL_DATA_MIN   20000
@@ -57,8 +57,9 @@
 
 String dataString = "";
 
-int intervalData = 0;           // Read data from sensor and GPS every 30 seconds
+int intervalData = 30000;           // Read data from sensor and GPS every 30 seconds
 int LastRead = 0;                   // Millisecond timer value for last data read
+int intervalFile = 0;
 int updateDelay = 0;          //120000          // Write most recent data to FTP server every 3 minutes
 int LastDataUpload = 0;             // Millisecond timer value for last data upload
 int intervalCfg = 0;                // Read timing configuration by FTP every 3 minutes
@@ -81,6 +82,7 @@ int statusSD = -1;
 bool fileSizeLimit = false;
 GPSSerial gpsSerial;
 int statusGPS = -1;
+int statusClock = 0;
 
 // Serial port parser
 char serialBuffer[SERIAL_BUFFER] = "";
@@ -98,65 +100,74 @@ void setup() {
   Serial.begin(115200);
 
   /* Device 1: WiFi Server 1111111111111111111111111111111111111111111111111111111*/
-  //statusWifi = airliftInit();
+  statusWifi = wifiDataInit();
   
-  if (!statusWifi){
-    if (!statusSD) logger.fileAddCSV((modem.readClock(0)+": WiFi server created"),2);
-  }
-  else{
-    if (!statusSD) logger.fileAddCSV((modem.readClock(0)+": WiFi not present"),2);
-  }
-
-  /* Device 2: Modem 2222222222222222222222222222222222222222222222222222222222222*/
-  statusModem = modem.init();
-  // Optional internal clock if modem is not present
-  if (statusModem){
-    //if (statusWifi) timeClient.begin();
-    logger.fileAddCSV("Modem not present",2);
-  }
-  else{
-    logger.fileAddCSV((modem.readClock(0)+": modem initialized"),2);
-  }
+//  if (!statusWifi){
+//    if (!statusSD) logger.fileAddCSV((modem.readClock(0)+": WiFi server created"),2);
+//  }
+//  else{
+//    if (!statusSD) logger.fileAddCSV((modem.readClock(0)+": WiFi not present"),2);
+//  }
+//
+//  /* Device 2: Modem 2222222222222222222222222222222222222222222222222222222222222*/
+//  statusModem = modem.init();
+//  // Optional internal clock if modem is not present
+//  if (statusModem){
+//    //if (statusWifi) timeClient.begin();
+//    logger.fileAddCSV("Modem not present",2);
+//  }
+//  else{
+//    logger.fileAddCSV((modem.readClock(0)+": modem initialized"),2);
+//  }
 
   // Device 4: SD card, disable if using Feather WiFi (set status = -1)
-  statusSD = logger.init();
-  if (!statusSD){
-    logger.fileRemove(1);
-    logger.logNewName();
-    logger.fileAddCSV("**********************************************",2);
-    logger.fileAddCSV(("Firmware v0.3, Settings: " + settingsString()),2);
-  }
-  
-  // Device 3: GPS sensor
-  statusGPS = gpsSerial.init();
-  if (!statusGPS){
-    logger.fileAddCSV((modem.readClock(0)+": GPS sensor initialized"),2);
-  }
-  else {
-    logger.fileAddCSV((modem.readClock(0)+": GPS sensor not found"),2);
-  }
-
-  // Create a data acquisition file based on the date
-  if (!statusSD){
-    logger.fileNewName(modem.readClock(1));
-    logger.fileAddCSV((modem.readClock(0)+": Data acquisition file = " + logger.fileNameString()),2);
-  }
+//  statusSD = logger.init();
+//  if (!statusSD){
+//    logger.fileRemove(1);
+//    logger.logNewName();
+//    logger.fileAddCSV("**********************************************",2);
+//    logger.fileAddCSV(SW_VER_NUM,2);
+//    logger.fileAddCSV(("Settings: " + settingsString()),2);
+//  }
+//  
+//  // Device 3: GPS sensor
+//  statusGPS = gpsSerial.init();
+//  if (!statusGPS){
+//    logger.fileAddCSV((modem.readClock(0)+": GPS sensor initialized"),2);
+//  }
+//  else {
+//    logger.fileAddCSV((modem.readClock(0)+": GPS sensor not found"),2);
+//  }
+//
+//  // Create a data acquisition file based on the date
+//  if (!statusSD){
+//    if (!statusModem){
+//      logger.fileNewName(modem.readClock(1));
+//    }
+//    else if (!statusGPS){
+//      logger.fileNewName(gpsSerial.date());
+//    }
+//    else{
+//      logger.fileNewName("data");
+//    }
+//    logger.fileAddCSV((modem.readClock(0)+": Data acquisition file = " + logger.fileNameString()),2);
+//  }
 
   /* Device 1: Chemical sensor 11111111111111111111111111111111111111111111111111111111111111*/
   statusSensor = k96.init();
-  if (!statusSensor){
-    logger.fileAddCSV((modem.readClock(0)+": K96 Sensor = " + k96.readSensorID()+" Firmware = " + k96.readSensorFW()),2);
-  }
-
-  // Completed startup, with internet connection store system log with FTP
-  if (!statusModem){
-    File tempFile = logger.fileOpen(2);
-    int currentFTP = modem.ftpPut(tempFile,2);
-    if (!currentFTP){
-      lastFTPByteLog = tempFile.size();
-    }
-    tempFile.close();
-  }
+//  if (!statusSensor){
+//    logger.fileAddCSV((modem.readClock(0)+": K96 Sensor = " + k96.readSensorID()+" Firmware = " + k96.readSensorFW()),2);
+//  }
+//
+//  // Completed startup, with internet connection store system log with FTP
+//  if (!statusModem){
+//    File tempFile = logger.fileOpen(2);
+//    int currentFTP = modem.ftpPut(tempFile,2);
+//    if (!currentFTP){
+//      lastFTPByteLog = tempFile.size();
+//    }
+//    tempFile.close();
+//  }
 }
 
 /******************************************************************************************************
@@ -172,22 +183,19 @@ void loop() {
 
   if (!statusWifi){
     // compare the previous status to the current status
-    if (status != WiFi.status()) {
+    if (status != WiFi.status() || status == WL_AP_CONNECTED) {
       // it has changed update the variable
       status = WiFi.status();
   
-      if (status == WL_AP_CONNECTED) {
-        // a device has connected to the AP
-        logger.fileAddCSV((modem.readClock(0)+": Device connected to WiFi"),2);
-      } else {
-        // a device has disconnected from the AP, and we are back in listening mode
-        logger.fileAddCSV((modem.readClock(0)+": Device disconnected from WiFi"),2);
-      }
-    }
-    
+//      if (status == WL_AP_CONNECTED) {
+//        // a device has connected to the AP
+//        logger.fileAddCSV((modem.readClock(0)+": Device connected to WiFi"),2);
+//      } else {
+//        // a device has disconnected from the AP, and we are back in listening mode
+//        logger.fileAddCSV((modem.readClock(0)+": Device disconnected from WiFi"),2);
+//      }
     WiFiClient client = server.available();   // listen for incoming client
     if (client) {                             // if you get a client,
-      Serial.println(client);
       String currentLine = "";                // make a String to hold incoming data from the client
       while (client.connected()) {            // loop while the client's connected
         if (client.available()) {             // if there's bytes to read from the client,
@@ -234,7 +242,7 @@ void loop() {
               client.print("Click <a href=\"/FILEOFF\">OFF</a><br>");
   
               client.print("<br><br>Simcom Mode Clock: ");
-              client.print(modem.readClock(0));
+              //client.print(modem.readClock(0));
                 
               client.print("<br><br>CSVString=");
               client.print(dataString);
@@ -253,44 +261,54 @@ void loop() {
           if (currentLine.endsWith("GET /H")) {
             //DisplayInternalTemps = 1;               // GET /H turns the LED on
           }
-          if (currentLine.endsWith("GET /L")) {
+          else if (currentLine.endsWith("GET /L")) {
             //DisplayInternalTemps = 0;                // GET /L turns the LED off
           }
           // Check to see if the client request was "GET /H" or "GET /L":
-          if (currentLine.endsWith("GET /DELAY0")) {
+          else if (currentLine.endsWith("GET /DELAY0")) {
+           
             intervalData = 1000;               // GET /H turns the LED on
           }
-          if (currentLine.endsWith("GET /DELAY1")) {
+          else if (currentLine.endsWith("GET /DELAY1")) {
+           
             intervalData = 5000;                // GET /L turns the LED off
           }
-          if (currentLine.endsWith("GET /DELAY2")) {
+          else if (currentLine.endsWith("GET /DELAY2")) {
+           
             intervalData = 10000;                // GET /L turns the LED off
           }
-          if (currentLine.endsWith("GET /DELAY3")) {
+          else if (currentLine.endsWith("GET /DELAY3")) {
+            
             intervalData = 30000;                // GET /L turns the LED off
           }
           
           // Check to see if the client request was GPS related
-          if (currentLine.endsWith("GET /GPSON")) {
+          else if (currentLine.endsWith("GET /GPSON")) {
             if (statusGPS){
+            
               statusGPS = gpsSerial.init();               // Check GPS status
             }
           }
-          if (currentLine.endsWith("GET /GPSOFF")) {
+          else if (currentLine.endsWith("GET /GPSOFF")) {
+              
             statusGPS = -1;                           // Set GPS status to error, disable
           }
-          if (currentLine.endsWith("GET /MODEMINIT")) {
+          else if (currentLine.endsWith("GET /MODEMINIT")) {
+            
             modem.init();                  // Entire start-up process for GPS session
           }
           // Check to see if the client request was "GET /H" or "GET /L":
-          if (currentLine.endsWith("GET /FILEON")) {
+          else if (currentLine.endsWith("GET /FILEON")) {
+          
             statusSD = logger.init();               // GET /H turns the LED on     
           }
-          if (currentLine.endsWith("GET /FILEOFF")) {
+          else if (currentLine.endsWith("GET /FILEOFF")) {
+          
             statusSD = -1;                // GET /L turns the LED off
           }
-          if (currentLine.endsWith("GET /RAW")) {
+          else if (currentLine.endsWith("GET /RAW")) {
             
+                     
             client.print(dataString);
           }
         }
@@ -298,6 +316,7 @@ void loop() {
       // close the connection:
       client.stop();
     }
+  }
   }
 
   // Check the serial port for user input, single letter codes
@@ -310,7 +329,18 @@ void loop() {
     serialCommand = String(serialBuffer);
     serialCommand = serialCommand.substring(0,serialDataSize);
     
-    if (serialCommand == "d"){
+    if (serialCommand == "status"){
+      Serial.println("System Status");
+      Serial.print("Modem = ");
+      Serial.println(statusModem);
+      Serial.print("SD Card = ");
+      Serial.println(statusSD);
+      Serial.print("GPS Sensor = ");
+      Serial.println(statusGPS);
+      Serial.print("Sensor = ");
+      Serial.println(statusSensor);
+    }
+    else if (serialCommand == "d"){
       Serial.println(dataString);
     }
     else if (serialCommand.startsWith("d=")){
@@ -321,6 +351,9 @@ void loop() {
 
     //********************************************************************************
     // SD Card commands
+    else if (serialCommand == "filename"){
+      Serial.println(logger.fileNameString());                 // Data file
+    }
     else if (serialCommand == "f"){
       logger.fileDump(0);                 // Data file
     }
@@ -351,21 +384,6 @@ void loop() {
       logger.fileAddCSV((modem.readClock(0)+": FTP Upload Delay = " + String(updateDelay)),2);
     }
     
-    else if (serialCommand == "u"){
-      Serial.print("Simcom 7070G FTP Get = ");
-      updateConfig();
-      Serial.println(settingsString());
-    }
-    else if (serialCommand == "s"){
-      Serial.print("Simcom 7070G FTP Put File= ");
-      File tempFile = logger.fileOpen(0);
-      Serial.println(modem.ftpPut(tempFile,0));
-      tempFile.close();
-    }
-    else if (serialCommand == "S"){
-      Serial.print("Simcom 7070G FTP Put Append Data= ");
-      Serial.println(modem.ftpPut(dataString));
-    }
     else if (serialCommand == "e"){
       Serial.print("Simcom 7070G Device Echo Off = ");
       Serial.println(modem.echoOff());
@@ -423,11 +441,11 @@ void loop() {
       Serial.print("Simcom 7070G Enabled = ");
       Serial.println(modem.RFOn());
     }
-    else if (serialCommand == "5"){
+    else if (serialCommand == "net off"){
       Serial.println("Simcom 7070G Network Deactivated = ");
       Serial.println(modem.disableIP());
     }
-    else if (serialCommand == "6"){
+    else if (serialCommand == "net on"){
       Serial.println("Simcom 7070G Network Activated = ");
       Serial.println(modem.enableIP());
     }
@@ -436,10 +454,6 @@ void loop() {
     else if (serialCommand == "ftp start"){
       Serial.println("Simcom 7070G FTP Reset ");
       Serial.println(modem.startFTP());
-    }
-    else if (serialCommand == "ftp ls"){
-      Serial.print("Simcom 7070G FTP List = ");
-      Serial.println(modem.ftpList());
     }
     else if (serialCommand == "ftp un"){
       Serial.print("Simcom 7070G FTP Set Username = ");
@@ -456,6 +470,31 @@ void loop() {
     else if (serialCommand == "ftp server"){
       Serial.print("Simcom 7070G FTP Set Server = ");
       Serial.println(modem.ftpCID());
+    }
+    
+    else if (serialCommand == "ftp ls"){
+      Serial.print("Simcom 7070G FTP List = ");
+      Serial.println(modem.ftpList());
+    }
+    else if (serialCommand == "ftp update"){
+      Serial.print("Simcom 7070G FTP Get = ");
+      if (updateConfig() >= 0){
+        Serial.print("File downloaded");
+        Serial.println(settingsString());
+      }
+      else {
+        Serial.println("FTP Download Failed");
+      }
+    }
+    else if (serialCommand == "s"){
+      Serial.print("Simcom 7070G FTP Put File= ");
+      File tempFile = logger.fileOpen(0);
+      Serial.println(modem.ftpPut(tempFile,0));
+      tempFile.close();
+    }
+    else if (serialCommand == "S"){
+      Serial.print("Simcom 7070G FTP Put Append Data= ");
+      Serial.println(modem.ftpPut(dataString));
     }
 
     //*********************************************************************************
@@ -487,130 +526,133 @@ void loop() {
  */
   
   if ((millis()-LastRead) > intervalData){
-    
+//    
     LastRead = millis();
     int option = (updateDelay != 0);
-
-    // First two elements are date and time
-    if (statusModem){
-      dataString = gpsSerial.date() + ',' + gpsSerial.time() + ',';
-    }
-    else{
-      dataString = modem.readClock(0)+',';
-    }
-    
+//
+//    // First two elements are date and time
+//    if (statusClock == 1){
+//      //dataString = gpsSerial.date() + ',' + gpsSerial.time() + ',';
+//    }
+//    else if (statusClock == 2){
+//      dataString = modem.readClock(0)+',';
+//    }
+//    else{
+      dataString = ',' + String(millis()/1000) + ',';
+//    }
+//    
     dataString += k96.readCSVString();                              // Sensor data
-    dataString += gpsSerial.readResponse();                         // GPS data
-  
-    if(!statusSD){
-      statusSD = logger.fileAddCSV(dataString, option);
-      fileSizeLimit  = (logger.fileCheckSize() > LOG_MAX_SIZE);
-    }
-    //FTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTP
-    // Update the data file on the FTP server
-    if (updateDelay && (millis()-LastDataUpload) > updateDelay){
-      File tempFile = logger.fileOpen(1);
-      int currentFTP = modem.ftpPut(tempFile,1);
-      tempFile.close();
-      if (!currentFTP){
-        logger.fileAddCSV((modem.readClock(0)+": File append, recent data"),2);
-        logger.fileRemove(1);         
-        LastDataUpload = millis();
-        statusFTP = 0;
-      }
-      // Failed FTP, increment the consecutive failure counter
-      else{
-        statusFTP += 1;
-        logger.fileAddCSV((modem.readClock(0)+": FTP ERROR append"),2);
-      }
-        
-    }
-      
-      // LOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOG
-      // Update the system log, append only the bytes since the last successful FTP transfer
-      else if (intervalLog && (millis()-timerLastLog) > intervalLog){
-        File tempFile = logger.fileOpen(2);
-        tempFile.seek(lastFTPByteLog);
-        int currentFTP = modem.ftpPut(tempFile,2);
-        // Successful FTP, record in log, set number bytes, reset timer 
-        if (!currentFTP){
-          logger.fileAddCSV((modem.readClock(0)+": Log file updated"),2);
-          timerLastLog = millis();
-          statusFTP = 0;
-          lastFTPByteLog = tempFile.size();
-        }
-        else{
-          logger.fileAddCSV((modem.readClock(0)+": Log file upload failed"),2);
-          statusFTP += 1;
-        }
-        tempFile.close();
-      }
-      //CONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIG
-      // Not updating the data file
-      else if (intervalCfg && (millis()-timerLastCfg) > intervalCfg){
-        int currentFTP = updateConfig();
-        if (currentFTP < -1){
-          logger.fileAddCSV((modem.readClock(0)+": Invalid settings"),2);
-          timerLastCfg = millis();
-          statusFTP = 0;
-        }
-        else if (currentFTP == -1){
-          logger.fileAddCSV((modem.readClock(0)+": Config Download: Invalid file"),2);
-          statusFTP += 1;
-        }
-        else if (currentFTP >0){
-          logger.fileAddCSV((modem.readClock(0)+": Settings Updated = " + settingsString()),2);
-          timerLastCfg = millis();
-          statusFTP = 0;
-        }
-        else{
-          statusFTP = 0;
-          timerLastCfg = millis();
-        }
-      }
-      //BACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUP
-      // Upload the dated CSV file
-      else if (((intervalBackup && (millis()-LastFileUpload) > intervalBackup)) || fileSizeLimit){
-        
-        File tempFile = logger.fileOpen(0);
-        tempFile.seek(lastFTPByteBackup);
-        int currentFTP = modem.ftpPut(tempFile,0);
-        if (!currentFTP){
-          logger.fileAddCSV((modem.readClock(0)+": Backup file updated"),2);
-          LastFileUpload = millis();
-          statusFTP = 0;
-          lastFTPByteBackup = tempFile.size();
-          if (fileSizeLimit){
-            logger.fileNewName(modem.readClock(1));
-            logger.fileAddCSV((modem.readClock(0)+": File size limit. New file"),2);
-            lastFTPByteBackup = 0;
-          }
-        }
-        else {
-          logger.fileAddCSV((modem.readClock(0)+": File backup failed"),2);
-          statusFTP += 1;
-        }
-        
-        tempFile.close();
-      }
-      //ERRORERRORERRORERRORERRORERRORERRORERRORERRORERRORERRORERRORERRORERRORERRORERROR
-      // After 5 consecutive failures reset the power to the modem
-      if (statusFTP >= 5){
-        logger.fileAddCSV((modem.readClock(0)+": FTP ERRORS, Modem reset"),2);
-        Serial.println("Modem reset");
-        modem.disableIP();
-        delay(1000);
-        modem.powerToggle();
-        Serial.println("PowerOFF");
-        modem.powerToggle();
-        Serial.println("PowerON");
-      }
-      //POWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWER
-      // If sufficient delay until next modem action, disable network connection
-      if (updateDelay >= 45000){
-        Serial.println("File Updated");
-        //modem.disableIP();
-      }
+//    //dataString += gpsSerial.readResponse();                         // GPS data
+//  
+//    if(!statusSD && intervalFile){
+//      statusSD = logger.fileAddCSV(dataString, option);
+//      fileSizeLimit  = (logger.fileCheckSize() > LOG_MAX_SIZE);
+//    }
+//    //FTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTP
+//    // Update the data file on the FTP server
+//    if (updateDelay && (millis()-LastDataUpload) > updateDelay){
+//      File tempFile = logger.fileOpen(1);
+//      int currentFTP = modem.ftpPut(tempFile,1);
+//      tempFile.close();
+//      if (!currentFTP){
+//        logger.fileAddCSV((modem.readClock(0)+": File append, recent data"),2);
+//        logger.fileRemove(1);         
+//        LastDataUpload = millis();
+//        statusFTP = 0;
+//      }
+//      // Failed FTP, increment the consecutive failure counter
+//      else{
+//        statusFTP += 1;
+//        logger.fileAddCSV((modem.readClock(0)+": FTP ERROR append"),2);
+//      }
+//        
+//    }
+//      
+//      // LOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOG
+//      // Update the system log, append only the bytes since the last successful FTP transfer
+//      else if (intervalLog && (millis()-timerLastLog) > intervalLog){
+//        File tempFile = logger.fileOpen(2);
+//        tempFile.seek(lastFTPByteLog);
+//        int currentFTP = modem.ftpPut(tempFile,2);
+//        // Successful FTP, record in log, set number bytes, reset timer 
+//        if (!currentFTP){
+//          logger.fileAddCSV((modem.readClock(0)+": Log file updated"),2);
+//          timerLastLog = millis();
+//          statusFTP = 0;
+//          lastFTPByteLog = tempFile.size();
+//        }
+//        else{
+//          logger.fileAddCSV((modem.readClock(0)+": Log file upload failed"),2);
+//          statusFTP += 1;
+//        }
+//        tempFile.close();
+//      }
+//      //CONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIG
+//      // Not updating the data file
+//      else if (intervalCfg && (millis()-timerLastCfg) > intervalCfg){
+//        int currentFTP = updateConfig();
+//        if (currentFTP < -1){
+//          logger.fileAddCSV((modem.readClock(0)+": Invalid settings"),2);
+//          timerLastCfg = millis();
+//          statusFTP = 0;
+//        }
+//        else if (currentFTP == -1){
+//          logger.fileAddCSV((modem.readClock(0)+": Config Download: Invalid file"),2);
+//          statusFTP += 1;
+//        }
+//        else if (currentFTP >0){
+//          logger.fileAddCSV((modem.readClock(0)+": Settings Updated = " + settingsString()),2);
+//          timerLastCfg = millis();
+//          statusFTP = 0;
+//        }
+//        else{
+//          statusFTP = 0;
+//          timerLastCfg = millis();
+//        }
+//      }
+//      //BACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUP
+//      // Upload the dated CSV file
+//      else if (((intervalBackup && (millis()-LastFileUpload) > intervalBackup)) || fileSizeLimit){
+//        
+//        File tempFile = logger.fileOpen(0);
+//        tempFile.seek(lastFTPByteBackup);
+//        int currentFTP = modem.ftpPut(tempFile,0);
+//        if (!currentFTP){
+//          logger.fileAddCSV((modem.readClock(0)+": Backup file updated"),2);
+//          LastFileUpload = millis();
+//          statusFTP = 0;
+//          lastFTPByteBackup = tempFile.size();
+//          if (fileSizeLimit){
+//            logger.fileNewName(modem.readClock(1));
+//            logger.fileAddCSV((modem.readClock(0)+": File size limit. New file"),2);
+//            lastFTPByteBackup = 0;
+//          }
+//        }
+//        else {
+//          logger.fileAddCSV((modem.readClock(0)+": File backup failed"),2);
+//          statusFTP += 1;
+//        }
+//        
+//        tempFile.close();
+//      }
+//      //ERRORERRORERRORERRORERRORERRORERRORERRORERRORERRORERRORERRORERRORERRORERRORERROR
+//      // After 5 consecutive failures reset the power to the modem
+//      if (statusFTP >= 5){
+//        logger.fileAddCSV((modem.readClock(0)+": FTP ERRORS, Modem reset"),2);
+//        Serial.println("Modem reset");
+//        modem.disableIP();
+//        delay(1000);
+//        modem.powerToggle();
+//        Serial.println("PowerOFF");
+//        modem.powerToggle();
+//        Serial.println("PowerON");
+//      }
+//      //POWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWER
+//      // If sufficient delay until next modem action, disable network connection
+//      if (updateDelay >= 45000){
+//        Serial.println("File Updated");
+//        //modem.disableIP();
+//      }
   }    
 }
 
@@ -635,11 +677,12 @@ int updateConfig(){
   int found;
   int num;
   int change = 0;
+  
   json = modem.ftpGet();
   
   // Empty string indicates file not opened
   if (json.length() < 20){
-    return -1;
+    return 0;
   }
   found = json.indexOf("intervalData=");
   if (found >= 0){
