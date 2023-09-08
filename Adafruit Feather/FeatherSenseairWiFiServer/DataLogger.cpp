@@ -24,8 +24,13 @@ DataLogger::DataLogger(){
 }
 
 int DataLogger::init(){
-    // see if the card is present and can be initialized:
-  status = !SD.begin(SD_CS);
+  // see if the card is present and can be initialized:
+  if (SD.begin(SD_CS)){
+    status = 0;
+  }
+  else{
+    status = 1;
+  }
   return status;
 }
 
@@ -118,9 +123,13 @@ int DataLogger::fileCheckSize(){
  *  Add a single line of text to a new/existing file
  */
 int DataLogger::fileAddCSV(String csvString, int option){
-  // open the file. note that only one file can be open at a time,
-  // so you have to close this one before opening another.
-  if (!status){
+  
+  // SD card is enabled but in error (could have been removed) try to reinitialize
+  if (status > 0){
+    init();
+  }
+  // Previous section could have reset the status variable
+  if (status == 0){
     File dataFile;
 
     // if the file is available, write to it, else log error
@@ -129,7 +138,9 @@ int DataLogger::fileAddCSV(String csvString, int option){
       if (dataFile) {
         dataFile.println(csvString);
         dataFile.close();
-        return 0;
+      }
+      else{
+        status = 1;
       }
     }
     
@@ -139,7 +150,9 @@ int DataLogger::fileAddCSV(String csvString, int option){
       if (dataFile) {
         dataFile.println(csvString);
         dataFile.close();
-        return 0;
+      }
+      else{
+        status = 1;
       }
     }
     else if (option == 2){
@@ -148,12 +161,13 @@ int DataLogger::fileAddCSV(String csvString, int option){
       if (dataFile) {
         dataFile.println(csvString);
         dataFile.close();
-        return 0;
+      }
+      else{
+        status = 1;
       }
     }
-    return 1;
   }
-  return -1;    
+  return status;    
 }
 
 /*

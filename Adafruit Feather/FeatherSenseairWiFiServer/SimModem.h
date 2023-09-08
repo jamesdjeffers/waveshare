@@ -20,14 +20,20 @@
 #ifndef SimModem_h
 #define SimModem_h
 
-#define modemRX 21
-#define modemTX 20
-#define modemBaud 9600
-#define modemTimeout 200
+#define modemRX                 21
+#define modemTX                 20
+#define modemBaud               9600
+#define modemTimeout            200
+
+#define MODEM_STATUS_UNKNOWN    -3
+#define MODEM_STATUS_OFF        -2
+#define MODEM_STATUS_CONNECT    -1
+#define MODEM_STATUS_ON         0
+#define MODEM_STATUS_ERROR      1
 
 #define MODEM_BUFFER 1360
 
-#define MODEM_POWER     6
+#define MODEM_POWER     6                           // Board Design 0.2 used pin ?, header, and jumper
 
 #define ATI        "ATI"                            // Device info, query purposes
 #define ATE_OFF    "ATE0"                           // Turns off echo mode
@@ -61,17 +67,20 @@
 
 #define AT_FTP_EXT "AT+FTPQUIT"
 #define AT_FTP_CID "AT+FTPCID=1"
+#define AT_FTP_STA "AT+FTPSTATE"
 #define AT_FTP_SRV FTP_SERVER
 #define AT_FTP_UN  FTP_UN
 #define AT_FTP_PWD FTP_PWD
 #define AT_FTP_PRT "AT+FTPPORT=21"
-#define AT_FTP_TYP "AT+FTPTYPE=\"I\""
+#define AT_FTP_TYP "AT+FTPTYPE=A"
+#define AT_FTP_MOD "AT+FTPMODE=1"
+
 
 #define AT_FTP_GET_NAM "AT+FTPGETNAME=\"config.json\""
-#define AT_FTP_GET_PTH "AT+FTPGETPATH=\"/\""
+#define AT_FTP_GET_PTH "AT+FTPGETPATH=\"/incoming/binbin\""
 
 #define AT_FTP_PUT_NM1 "AT+FTPPUTNAME="
-#define AT_FTP_PUT_PTH "AT+FTPPUTPATH=\"/\""
+#define AT_FTP_PUT_PTH "AT+FTPPUTPATH=\"/incoming/binbin/\""
 #define AT_FTP_PUT_NEW "AT+FTPPUTOPT=\"STOR\""
 #define AT_FTP_PUT_APP "AT+FTPPUTOPT=\"APPE\""
 
@@ -98,8 +107,9 @@ class SimModem
 private:
   
   char buffer [1360] = "";
-  int status = -3;                    // Contains operation mode data (-3 = unknown, -2 = startup, -1 = connecting, 0 = on)
+  int status = MODEM_STATUS_UNKNOWN;  // Contains operation mode data (-3 = unknown, -2 = startup, -1 = connecting, 0 = on)
   long timer = 0;                     // Used to track internal actions, stores millisecond timer
+  String imei = "";
   
 public:
   SimModem();                         // Constructor
@@ -112,6 +122,7 @@ public:
   
   int startNTP();                    // Internal time clock server
   int startFTP();                    // Data server initialization
+  int checkFTP();                    // Determines if there is an active FTP server connection
   
   // Parses the entire strings received from modem
   String readResponse(String command, int waitTime);
@@ -148,6 +159,7 @@ public:
   String ftpUsername();
   String ftpPwd();
   String ftpServer();
+  String ftpFile();
 
   String GPSOn();
   String GPSOff();
