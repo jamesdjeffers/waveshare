@@ -1,2 +1,4 @@
 
 Adafruit Feather/FeatherSenseairWiFiServer/secrets.h
+*.csv
+*.txt
