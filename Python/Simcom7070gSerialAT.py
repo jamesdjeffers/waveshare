@@ -1,8 +1,9 @@
 # Multiple functions implementing various network applications for
-# SimCom 7080G modem using "AT" commands on serial port "COM30"
+# SimCom 7080G modem using "AT" commands on the specified serial port
 # Assumes device is configured and connected to network.
 # Created by James D. Jeffers
 # Date: 2022/06/27
+# Updated: 2023/10/16
 
 import serial
 import time
@@ -10,7 +11,7 @@ import secrets
 
 TIMEOUT_DEFAULT=0.2
 
-ser = serial.Serial("COM30",115200,timeout=TIMEOUT_DEFAULT)
+ser = serial.Serial("COM42",115200,timeout=TIMEOUT_DEFAULT)
 command_input = ''
 rec_buff = ''
 
@@ -93,6 +94,33 @@ def modemInit():
     readResponse('AT+CNACT?',0)                             # Check connection
     readResponse('AT+CSQ',0)                                # Check signal strength
 
+def modemInit2():
+    print('SIM7080X is starting:')
+    ser.flushInput()
+    readWaitResponse('AT','OK',60000)
+    readResponse('AT+CFUN=0',0)                             # Disable device RF
+    readResponse('AT+CPIN',0)
+    
+    readResponse('AT+CGDCONT=1,"IPV4V6","Wholesale"',0)     # Using profile 1
+    readResponse('AT+CBANDCFG="CAT-M",2,4,12',0)            # T-Mobile (Mint) 4G network configuration    
+    readResponse('AT+COPS=0,2,"310260"',0)                  # T-Mobile (Mint) 4G network configuration
+
+    readResponse('AT+COPS?',0)
+    readResponse('AT+CNCFG=0,2,"Wholesale"',0)             # Using profile 2
+    readResponse('AT+CNCFG?',0)
+    readResponse('AT+CFUN=1',0)                            # Enable device RF
+    time.sleep(3)                                          # Wait for device to detect network
+    readResponse('AT+CGDCONT=1,"IPV4V6","Wholesale"',0)    # Repeat commands (don't know why)
+    readResponse('AT+CBANDCFG="CAT-M",2,4,12',0)
+    
+    readResponse('AT+COPS?',0)
+    readResponse('AT+COPS=0,2,"310260"',0)                 # Repeat commands (dont' know why)
+    readResponse('AT+CNCFG=0,2,"Wholesale"',0)
+    readResponse('AT+CNCFG?',0)
+    readResponse('AT+CNACT=1,1',0)                         # Connect to network
+    readResponse('AT+CNACT?',0)                            # Check connection
+    readResponse('AT+CSQ',0)                               # Check signal strength
+
 def modemClock():
     readResponse('AT+CNTPCID=1',0)
     readResponse('AT+CNTP="time.nist.gov",1',0)
@@ -154,7 +182,6 @@ def modemHTTPSRead():
         print('HTTPS read failed')
 
 def modemEmailCount():
-    #readResponse('AT+CSSLCFG=?',0)
                 
     readResponse('AT+EMAILCID=1',0)
     readResponse('AT+EMAILTO=30',0)
@@ -168,7 +195,6 @@ def modemEmailSend():
    
     readResponse('AT+EMAILCID=1',0)
     readResponse('AT+EMAILTO=30',0)
-    #readResponse('AT+EMAILSSL=1,1,"email.cer","email.pem"',0)
     readResponse('AT+EMAILSSL?',0)
     readResponse('AT+SMTPSRV="",465',0)
     readResponse('AT+SMTPAUTH=1,"",""',0)
@@ -196,19 +222,20 @@ def modemFTPConfig():
         print('FTP Channel')
         print(readResponse('AT+FTPCID=1',0))
         print('FTP Server')
-        readResponse('AT+FTPSERV=""',0)
-        readResponse('AT+FTPMODE=1',0)              # FTP mode to passive (other option active)
-        readResponse('AT+FTPTYPE=A',0)              # FTP data type is ASCII (other option binary)
-
-        readResponse('AT+FTPUN=""',0)               # FTP username (can be "anonymous" for some servers)
-        #readResponse('AT+FTPPW=""',0)              # FTP password (should be empty for some "anonymous" servers)
-
-        readResponse('AT+FTPGETNAME=""',0)          # Get file name
-        readResponse('AT+FTPGETPATH=""',0)          # Get file path
+        readResponse('AT+FTPSERV="ftp.caps.ou.edu"',0)  # FTP server name or IP address
         
-        readResponse('AT+FTPPUTNAME=""',0)          # Put file name
-        readResponse('AT+FTPPUTPATH=""',0)          # Put file path
-        #readResponse('AT+FTPPORT=21',0)
+        readResponse('AT+FTPMODE=1',0)                  # FTP mode to passive (other option active)
+        readResponse('AT+FTPTYPE=A',0)                  # FTP data type is ASCII (other option binary)
+        readResponse('AT+FTPPORT=21',0)                 # FTP port (default is 21, does not need to be set)
+
+        readResponse('AT+FTPUN="anonymous"',0)          # FTP username (can be "anonymous" for some servers)
+        #readResponse('AT+FTPPW=""',0)                  # FTP password (should be empty for some "anonymous" servers)
+
+        readResponse('AT+FTPGETNAME=""',0)              # Get file name
+        readResponse('AT+FTPGETPATH=""',0)              # Get file path
+        
+        readResponse('AT+FTPPUTNAME=""',0)              # Put file name
+        readResponse('AT+FTPPUTPATH=""',0)              # Put file path
     else:
         readResponse('AT+FTPSERV?',0)
         readResponse('AT+FTPMODE?',0)
@@ -216,45 +243,30 @@ def modemFTPConfig():
 
 def modemFTPSConfig():          # Configure FTP server for encrypted communication
     print("Downloading SSL certificate")
-    readResponse('AT+CSSLCFG=?',1)
     
-    readResponse('AT+CFSTERM',1)
-    readResponse('AT+CFSINIT',1)
-    readResponse('AT+CFSDFILE=0,""',1)
-    readResponse('AT+CFSGFRS?')
-    readResponse('AT+CBAINIT')
-    readResponse('AT+CFSWFILE=3,"",0,1492,1000',1)
-    readResponse('AT+CFSWFILE=3,"",0,1492,1000',1)
-    readResponse('AT+CFSWFILE=0,"",0,1450,1000',1)
-    readResponse('AT+CFSWFILE=0,"",0,5,1000',1)
+    readResponse('AT+CFSTERM',1)                            # Clear data buffer
+    readResponse('AT+CFSINIT',1)                            # Initialize file system
+    readResponse('AT+CFSWFILE=0,"",0,1450,1000',1)          # Write file with name and size
 
-    ser.write(('abc12').encode())
-    f = open("test.crt","r")
-    ser.write((f.read()).encode())
-    ser.write(f.read())
-    print(ser.read(50))
+    f = open("test.crt","r")                                # Open certificate file
+    ser.write((f.read()).encode())                          # Write certificate file to modem
+    print(ser.read(50))                                     # Final response should be OK
 
-    readResponse('AT+CFSGFRS?')
-    readResponse('AT+CFSGFIS=0,"test.txt"')
-    print(ser.read(50))
-    readResponse('AT+CFSRFILE=0,"test.crt",0,1450,0',2)
-    readResponse('AT+CFSGFIS=0,"test.crt"')
+    readResponse('AT+CFSRFILE=0,"",0,1450,0',2)             # Read back the file for display
     print(ser.read(1450))
-    readResponse('AT+CFSGFIS=0,"test.crt"')
-    print('convert')
-    readResponse('AT+CSSLCFG="sslversion",0,3',1)
-    readResponse('AT+CSSLCFG="ciphersuite",0,0,"0x0035"',1)
-    readResponse('AT+CSSLCFG="ignorertctime",0,1',1)
-    readResponse('AT+CSSLCFG="protocol",0,1',1)
-    readResponse('AT+CSSLCFG="ctxindex",0',1)
-    readResponse('AT+CFSTERM',1)
-    readResponse('AT+CSSLCFG="convert",2,"test.crt","test.key"')
-    readResponse('AT+CSSLCFG="convert",1,"test.crt"')
-    readResponse('AT+CFSRFILE=0,"test.crt",0,1450,0',2)
-    readResponse('AT+CFSGFIS=0,"test.crt"')
-    print(ser.read(1450))
+    print('')
+    
+    print('Configuring SSL layer')
+    readResponse('AT+CSSLCFG="sslversion",0,3',1)           # Set SSL version
+    readResponse('AT+CSSLCFG="ciphersuite",0,0,"0x0035"',1) # Set encryption type
+    readResponse('AT+CSSLCFG="ignorertctime",0,1',1)        # Ignore real time clock
+    readResponse('AT+CSSLCFG="protocol",0,1',1)             # Set layer security protocol
+    readResponse('AT+CSSLCFG="ctxindex",0',1)               # Set configuration index
+
+    print('Converting SSL certificate')
+    readResponse('AT+CSSLCFG="convert",1,""')       # COMMAND FAILS
+    
     readResponse('AT+FTPSSL?',0)
-    readResponse('AT+FTPSSL=1,0',0)
     readResponse('AT+FTPSSL=1,0,"",""',0)
     readResponse('AT+FTPSSL?',0)
     readResponse('AT+CFSTERM',1)
@@ -341,7 +353,12 @@ def modemFTPPut():          # Write a file to the FTP server
     
 def main():
     initCom()                           # Set the serial port for modem
-    #modemInit()                        # Configure the modem for the proper network, only needed once
+    modemInit2()                        # Configure the modem for the proper network, only needed once
+    #readResponse('AT+CNACT=1,0',0)
+    #readWaitResponse('AT','OK',60000)
+    #response = readWaitResponse('AT+COPS=?','OK',240000)
+    #print(response)
+    readResponse('AT+CPIN?',0)
     try:
         
         readResponse('AT+CGATT?',0)
@@ -361,19 +378,20 @@ def main():
         modemClock()                    # use NTP server to set real-time clock
         modemPing()                     # pings a known IP address to test connection speed
 
-        modemHTTPConfig()               # configures HTTP settings for accessing web pages
-        modemHTTPRead()                 # reads an IP address over HTTP
+        #modemHTTPConfig()               # configures HTTP settings for accessing web pages
+        #modemHTTPRead()                 # reads an IP address over HTTP
 
         #modemHTTPSRead()               # UNUSED reads an IP address over HTTPS
         #modemEmailCount()              # UNUSED access/read from a POP3 Gmail account
         #modemEmailSend()               # UNUSED access/send from a POP3 Gmail account
 
         print("Configuring...")         # configure the FTP feature of modem
-        modemFTPConfig()
+        #modemFTPConfig()
+        #modemFTPSConfig()
         print("Listing...")             # read the directory contents of FTP server
-        modemFTPList()
+        #modemFTPList()
         #modemFTPGet()                  # DISABLED Read a file on the FTP server
-        modemFTPPut()                   # write data to FTP server
+        #modemFTPPut()                   # write data to FTP server
         
     except :
         print('SimCom function failed.')
