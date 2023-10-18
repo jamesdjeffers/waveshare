@@ -84,9 +84,6 @@ String SimModem::readResponse(String command, int waitTime){
         return responseString.substring(0,bufferLength-2);
       }
     }
-//    else if (responseString.startsWith("Error")){
-//      return "Error";
-//    }
     else {
       return responseString.substring(0,responseString.indexOf('\n',1));
     }
@@ -136,7 +133,6 @@ String SimModem::readBurst(String command, int waitTime, String back){
    String responseString = "";
    int bytesToRead = 0;
   
-  //SimModemSerial.flush();
   SimModemSerial.println(command);                                                // Send AT command to modem
 
   if (waitTime){    SimModemSerial.setTimeout(waitTime);  }                       // Choose timeout option
@@ -172,7 +168,6 @@ String SimModem::readBurst(String command, int waitTime, String back){
     }
   else{
       bufferLength = SimModemSerial.readBytesUntil('\n',buffer, MODEM_BUFFER);
-      Serial.println("nope");
       return "";   // Timeout occurred
     }
 
@@ -187,20 +182,41 @@ String SimModem::readBurst(String command, int waitTime, String back){
  */
 
 void SimModem:: powerToggle(){
-  int pulses = 1;
-  String responseString = readResponse(ATE_OFF,0);
-  if (responseString.length() > 0) pulses = 2;          // Device is on and communicating, turn off then on
+  bool deviceOn = false;                                // Device is off, just turn on
+  int timer = 0;
+  SimModemSerial.flush();
+  String responseString = readResponse(ATE_OFF,0);      // Send ECHO OFF command, expect response "OK"
+  if (responseString.length() > 0) deviceOn = true;     // Device is on and communicating, turn off then on
   
-  for (int i=0; i<pulses; i++){
-    digitalWrite(MODEM_POWER, LOW);     // Value should be low already    
-    digitalWrite(MODEM_POWER, HIGH);    // Start of "ON" pulse
-    delay(1500);                        // Datasheet Ton mintues = 1.2S
-    digitalWrite(MODEM_POWER, LOW);     // Return output state to low
-    delay(1500);
+  if (deviceOn){
+    digitalWrite(MODEM_POWER, LOW);                     // Value should be low already    
+    digitalWrite(MODEM_POWER, HIGH);                    // Start of "ON/OFF" toggle pulse
+    delay(MODEM_TIMER_POWER_PULSE);                     // Datasheet Ton mintues = 1.2S
+    digitalWrite(MODEM_POWER, LOW);                     // Return output state to low
+
+    Serial.println("Modem power OFF");
+    timer = millis();
+    while (responseString.indexOf("NORMAL") >= 0 | responseString.indexOf("OK") != 0
+           & ((millis()-timer) < MODEM_TIMER_POWER_OFF)){
+      Serial.println(responseString);
+      responseString = readResponse(ATE_OFF,0);
+    }
+    status = -3;
+    delay(MODEM_TIMER_POWER_OFF);     // Wait before trying to restart
   }
 
-  while (responseString.indexOf("NORMAL") >= 0 | responseString.indexOf("OK") != 0){
+  digitalWrite(MODEM_POWER, LOW);     // Value should be low already    
+  digitalWrite(MODEM_POWER, HIGH);    // Start of "ON/OFF" toggle pulse
+  delay(MODEM_TIMER_POWER_PULSE);     // Datasheet Ton mintues = 1.2S
+  digitalWrite(MODEM_POWER, LOW);     // Return output state to low
+  Serial.println("Modem power ON");
+  timer = millis();
+  responseString = readResponse(ATE_OFF,0);      // Send ECHO OFF command, expect response "OK"
+  while (responseString.indexOf("NORMAL") >= 0 | responseString.indexOf("OK") != 0
+         & ((millis()-timer) < MODEM_TIMER_POWER_ON)){
     responseString = readResponse(ATE_OFF,0);
+    Serial.println("why");
+    status = -1;
   }
 }
 
@@ -235,16 +251,21 @@ int SimModem::powerOn(){
  *  Check if network connected (CGATT: 1)
  *  Check if network active
  *  Disables RF functionality to setup network config.
- *  No outputs currently.
+ *  
+ *  Output: Status = 0, everything OK
+ *          Status = 1, network error
+ *          Status = 2, NTP error
+ *          Status = -1, modem error 
  */
 int SimModem::startSession(){
 
+  int returnValue = 0;
   checkStatus();
   if (status == MODEM_STATUS_ERROR || status == MODEM_STATUS_ERROR){
-    Serial.println("exit");
     return -1;
   }
 
+  // Attempt to turn on the modem if no communication
   if (status == MODEM_STATUS_OFF){
     powerOn();
   }
@@ -255,30 +276,29 @@ int SimModem::startSession(){
     if(powerOn()){
       status = -1;
       return -1;
-    }
-    // From Simcom Application Note EXCEPT using PDP 1
-    // readWaitResponse(AT_RF_OFF,0, "CPIN:");
-    // readResponse(AT_RF_NET,0);
-    // readResponse(AT_RF_BAND,0);
-    // readResponse(AT_RF_ID,0);
-    // readResponse(AT_RF_CFG,0);
-    // readResponse(AT_RF_ON,0);
-    // delay(1000);
-    if (enableIP() >= 0){
-      startNTP();
-      startFTP();
-    }
-    
+    }    
   }
-  else{
-    if (enableIP() >= 0){
-      startNTP();
-      startFTP();
+
+  // Check for network connection, if connected synchronize time
+  Serial.println("Connecting");
+  returnValue = enableIP();
+  if (returnValue >= 0){
+    returnValue = startNTP();
+    if (returnValue > 0){
+      return 1;
     }
+    returnValue = startFTP();
+    if (returnValue > 0){
+      return 1;
+    }
+    imei = readResponse(AT_GSN,0);
+    Serial.println(imei);
+    imei = imei.substring(0,15) + "_";
+    return 0;
   }
-  imei = readResponse(AT_GSN,0);
-  imei = imei.substring(0,(imei.length()-1)) + "_";
-  return 0;
+  
+  imei = "none";
+  return 1;
 }
 
 /*  "startSession" of the Modem internet conncection
@@ -287,10 +307,16 @@ int SimModem::startSession(){
  *  No outputs currently.
  */
 int SimModem::startNTP(){
-  readResponse(AT_NTP_ID,0);
-  readResponse(AT_NTP_SET,0);
-  readWaitResponse(AT_NTP_UP,0,"CNTP:");
-  return 0;
+  String responseString;
+  readResponse(AT_NTP_ID,0);                                // Choose the clock configuration
+  readResponse(AT_NTP_SET,0);                               // Set the NTP server and time zone
+  responseString = readWaitResponse(AT_NTP_UP,0,"CNTP:");   // Update the internal clock, wait for confimation
+  if (responseString.indexOf("1,\"")){
+    return 0;
+  }
+  else{
+    return 1;
+  }
 }
 
 /*  "startFTP" session using modem internet connection
@@ -362,6 +388,9 @@ String SimModem::readSignal(){
 String SimModem::readVerify(){
   return readResponse(ATI,0);
 }
+String SimModem::readIMEI(){
+  return imei;
+}
 
 /*
  * Time string is in quotes if available
@@ -383,12 +412,23 @@ String SimModem::readClock(int format){
   }
   int startIndex = dateTimeResponse.indexOf("\"");
   int endIndex = dateTimeResponse.indexOf("\"",startIndex+1);
-  if (!format){
+  if (format == 0){
     return dateTimeResponse.substring(startIndex+1, dateTimeResponse.indexOf("-",startIndex));
   }
-  else{
+  else if (format == 1){
     dateTimeResponse = dateTimeResponse.substring(startIndex+1, dateTimeResponse.indexOf(",",startIndex));
     dateTimeResponse.replace("/","");
+    return dateTimeResponse;
+  }
+  else {
+    dateTimeResponse = dateTimeResponse.substring(startIndex+1, dateTimeResponse.indexOf("-",startIndex));
+    Serial.println(dateTimeResponse);
+    dateTimeResponse.replace("/","");
+    Serial.println(dateTimeResponse);
+    dateTimeResponse.replace(",","_");
+    Serial.println(dateTimeResponse);
+    dateTimeResponse.replace(":","");
+    Serial.println(dateTimeResponse);
     return dateTimeResponse;
   }
 }
@@ -424,6 +464,11 @@ String SimModem::readRFCfg(){
  * Response is channel of NTP data channel
  */
 String SimModem::readIPPing(){
+  checkStatus();
+  if (status != MODEM_STATUS_ON){
+    Serial.println(status);
+    return ("No internet connection");
+  }
   String pingResponse = readResponse(AT_IP_PING,3000);
   int ipAddressIndex = pingResponse.indexOf(",");  
   ipAddressIndex = pingResponse.indexOf(",", ipAddressIndex+1);
@@ -488,6 +533,7 @@ String SimModem::ftpList(){
       // Response will indicate number of bytes ready to read
       // Value may be 0, requires command to be repeated
       responseString = readWaitResponse(AT_FTP_LRD,10000,"FTPLIST: 2,");
+      Serial.println(responseString);
       while(responseString.indexOf("0") == 0){
         responseString = readWaitResponse(AT_FTP_LRD,10000,"FTPLIST: 2,");
       }
@@ -535,7 +581,6 @@ int SimModem::ftpPut(File dataFile, int option){
   if(modem < 0){
     return -62;
   }
-  startFTP();
   
   String responseString;
   char temp;
@@ -544,26 +589,16 @@ int SimModem::ftpPut(File dataFile, int option){
   int lastPutSize = dataSize % 1360;
   String lastPutString = AT_FTP_PWR + String(lastPutSize);
   
-  String putFileName;
-
-  if (option == 0){
-    putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + dataFile.name() + String("\"");
-    //readResponse(AT_FTP_PUT_APP,0);
-  }
-  else if (option == 1){
-    putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + dataFile.name() + String("\"");
-    //readResponse(AT_FTP_PUT_APP,0);
-  }
-  else if (option == 2){
-    putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + "log.txt" + String("\"");
-    //readResponse(AT_FTP_PUT_APP,0);
-  }
-  readResponse(putFileName,3000);
-  Serial.println(putFileName);
-  delay(1000);
+  String putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + readClock(2) + "_" + dataFile.name() + String("\"");
   
-  responseString = readWaitResponse(AT_FTP_PUT,3000,"FTPPUT:");         // Start FTP session
-  Serial.println(responseString);
+  readResponse(putFileName,3000);
+  delay(1000);
+  Serial.println(putFileName);
+  Serial.println(readResponse(AT_FTP_PUT_QNM,100));
+  // BUG? requires delay between filename change and FTP store
+  
+  responseString = readWaitResponse(AT_FTP_PUT,3000,"FTPPUT:");         // Start FTP session: expect +FTPPUT: 1,x
+                                                                        // x=77 file overwrite error, x=62 no internet
 
   while (responseString.indexOf("1,0") >= 0){                           // Wait for +FTPPUT: 1,1,xxxx (default xxxx = 1360)
     responseString = readWaitResponse(AT_FTP_PUT,3000,"FTPPUT:");
@@ -600,7 +635,15 @@ int SimModem::ftpPut(File dataFile, int option){
     if (responseString){
       return 0;
     }
-  }  
+  }
+  else if (responseString.indexOf("1,77") >= 0){
+    Serial.println("Operator Error: possible file overwrite");
+  }
+  else{
+    Serial.println("Connection failed");
+    int test = responseString.indexOf("1,1");
+    return test;
+  }
   return -1;
 }
 
@@ -608,14 +651,20 @@ int SimModem::ftpPut(File dataFile, int option){
  *  Attach a string to an existing file
  */
 
-String SimModem::ftpPut(String dataString){
+int SimModem::ftpPut(String dataString){
   char temp;
   int dataSize = dataString.length()+1;
   String putString = AT_FTP_PWR + String(dataSize);
   String responseString;
 
+  // Check that modem is present, powered on, connected to network
+  int modem = startSession();
+  if(modem < 0){
+    return -62;
+  }
+
   Serial.println(readResponse(AT_FTP_PUT_NEW,0));
-  Serial.println(readResponse(AT_FTP_PUT_NM1 + String("\"") + "jim.james" + String("\""),0));
+  Serial.println(readResponse(AT_FTP_PUT_QNM,0));
 
   Serial.print("FTP Put Request Transmission :");
   Serial.println(readWaitResponse(AT_FTP_PUT,3000,"FTPPUT:"));
@@ -634,7 +683,7 @@ String SimModem::ftpPut(String dataString){
   
   readWaitResponse(AT_FTP_PDN,10000,"FTPPUT: 1,0");
   //readWaitResponse(AT_FTP_EXT,0,"FTPPUT: 1,80");
-  return "Done";
+  return 0;
 }
 
 /*
@@ -690,6 +739,7 @@ String SimModem::ftpCID(){
  * Simcom 7070G cannot operate GPS and modem at same time
  */
 String SimModem::ftpUsername(){
+  Serial.println(readResponse(AT_FTP_UN_QRY,100));
   return readResponse(AT_FTP_UN,100);
 }
 
@@ -706,7 +756,19 @@ String SimModem::ftpPwd(){
  * Must append filename in quotes to end of AT command
  */
 String SimModem::ftpServer(){
+  Serial.println(readResponse(AT_FTP_SRV_QRY,100));
   return readResponse(AT_FTP_SRV,100);
+}
+
+int SimModem::ftpStatus(){
+  Serial.println(readResponse(AT_FTP_SRV_QRY,100));
+  Serial.println(readResponse(AT_FTP_UN_QRY,100));
+  Serial.println(readResponse(AT_FTP_GET_QNM,100));
+  Serial.println(readResponse(AT_FTP_GET_QPT,100));
+  Serial.println(readResponse(AT_FTP_PUT_QNM,100));
+  Serial.println(readResponse(AT_FTP_PUT_QPT,100));
+  Serial.println(readResponse(AT_FTP_PUT_QOP,100));
+  return 0;
 }
 
 /*
@@ -714,7 +776,35 @@ String SimModem::ftpServer(){
  * Must append filename in quotes to end of AT command
  */
 String SimModem::ftpFile(){
+  Serial.println(readResponse(AT_FTP_GET_QNM,1000));
   return readResponse(AT_FTP_PUT_NM1 + String("\"") + "test.txt" + String("\""),0);
+}
+
+/*
+ * MQTT Server Subscribe
+ * 
+ */
+int SimModem::mqttSub(){
+  readResponse(AT_MQT_SUB,0);
+  return 0;
+}
+
+/*
+ * MQTT Server Publish
+ * 
+ */
+int SimModem::mqttPub(){
+  readResponse(AT_MQT_PUB,0);
+  return 0;
+}
+
+/*
+ * MQTT File Name SetServer Unsubscribe
+ * 
+ */
+int SimModem::mqttUnsub(){
+  readResponse(AT_MQT_UNS,0);
+  return 0;
 }
 
 /*

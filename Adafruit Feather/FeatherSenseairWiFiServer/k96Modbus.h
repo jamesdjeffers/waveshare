@@ -73,6 +73,11 @@ private:
     String labels[9] = {"<br>CH4: ","<br>CO2: ","<br>H2O: ","<br>Pressure: ","<br>T0: ",
                         "<br>T1: ", "<br>T2: ", "<br>Humidity: ", "<br>T3: "};
       
+    int status = -1;
+    String deviceID = "";
+    
+    int readSensorID();
+    
     int k96_memory[K96_DATA_SIZE] = {1,1,1,1,1,1,1,1,1};
     long k96MemoryLong[3] = {1,1,1};
     int wordS16(byte high, byte low);
@@ -90,7 +95,7 @@ public:
     int writeCommand(int byteAddress);
     int readCSVString(String& output);  
     String readByteString(int byteAddress);
-    String readSensorID();
+    String getDeviceID();
     String readSensorFW();
 };
 

@@ -47,7 +47,11 @@ int k96Modbus::init(){
   }
   pinMode(K96_POWER,OUTPUT);
   digitalWrite(K96_POWER,HIGH);
-  return 0;
+  
+  readSensorID();
+  return status;
+  
+  
 }
 
 /*
@@ -83,10 +87,19 @@ int k96Modbus::readResponse(){
   return wordU16(test[3],test[4]);
 }
 
+
 long k96Modbus::readResponseLong(){
   byte test[10];
-  sensorSerial.readBytes(test,10);
-  return longConvert(test[3],test[4],test[5],test[6]);
+  int responseBytes = sensorSerial.readBytes(test,10);
+  if (responseBytes){
+    status = 0;
+    return longConvert(test[3],test[4],test[5],test[6]);
+  }
+  else{
+    status = -1;
+    return -1;
+  }
+  
 }
 
 int k96Modbus::readResponse(int numBytes){
@@ -177,9 +190,14 @@ String k96Modbus::readByteString(int byteAddress){
 /*
  * Returns
  */
-String k96Modbus::readSensorID(){
-  writeCommand(5);
-  return String(readResponseLong());
+int k96Modbus::readSensorID(){
+  writeCommand(5);                    // Command 5 for reading 4 bytes
+  deviceID = readResponseLong();      // Sets status variable if read = success
+  return status;
+}
+
+String k96Modbus::getDeviceID(){
+  return deviceID;
 }
 
 String k96Modbus::readSensorFW(){

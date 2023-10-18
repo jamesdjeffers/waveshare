@@ -27,24 +27,33 @@ int DataLogger::init(){
   // see if the card is present and can be initialized:
   if (SD.begin(SD_CS)){
     status = 0;
+    File root;
+    root = SD.open("/");
+    logFileCount = fileCount(root,LOG_FILE_NAME);
+    dataFileCount = fileCount(root,DATA_FILE_NAME);
+    root.close();
   }
   else{
-    status = 1;
+    status = -1;
   }
   return status;
 }
+
+/*
+ *  Transmit file data over serial port
+ */
 
 int DataLogger::fileDump(int option){
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
   String temp;
-  if (option == 0){
+  if (option == FILE_TYPE_DATA){
     temp = fileName;
   }
-  else if (option == 1){
+  else if (option == FILE_TYPE_BACKUP){
     temp = TEMP_DATA;
   }
-  else if (option == 2){
+  else if (option == FILE_TYPE_LOG){
     temp = logName;
   }
   File dataFile = SD.open(temp);
@@ -133,7 +142,7 @@ int DataLogger::fileAddCSV(String csvString, int option){
     File dataFile;
 
     // if the file is available, write to it, else log error
-    if (option <= 1) {
+    if (option <= FILE_TYPE_DATA) {
       dataFile = SD.open(fileName, FILE_WRITE);
       if (dataFile) {
         dataFile.println(csvString);
@@ -144,7 +153,7 @@ int DataLogger::fileAddCSV(String csvString, int option){
       }
     }
     
-    if (option == 1){
+    if (option == FILE_TYPE_BACKUP){
       dataFile = SD.open(fileName, FILE_WRITE);
       // if the file is available, write to it, else log error
       if (dataFile) {
@@ -155,8 +164,21 @@ int DataLogger::fileAddCSV(String csvString, int option){
         status = 1;
       }
     }
-    else if (option == 2){
+    else if (option == FILE_TYPE_LOG){
       dataFile = SD.open(logName, FILE_WRITE);
+      // if the file is available, write to it, else log error
+      if (dataFile) {
+        dataFile.println(csvString);
+        dataFile.close();
+      }
+      else{
+        status = 1;
+      }
+    }
+    // Status file, contains info on last network and data file operations
+    else if (option == FILE_TYPE_STATUS){
+      SD.remove(STATUS_DATA);
+      dataFile = SD.open(STATUS_DATA, FILE_WRITE);
       // if the file is available, write to it, else log error
       if (dataFile) {
         dataFile.println(csvString);
@@ -245,27 +267,19 @@ int DataLogger::fileCount(File dir, String fileName){
 }
 
 /*
- *  Create a new file on the SD card using the date string
- *  File names are limited to 8 characters: YYMMDD_x.csv
- *  x (maximum 62) = 0-9,A-Z,a-z
+ *  Create a new file on the SD card using the file type count
+ *  File names are limited to 8 characters: dXXXXXXX.csv
+ *  X is the file number 0000000 - 9999999
  */
-void DataLogger::fileNewName(String dateTime){
+void DataLogger::fileNewName(){
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
-  File root;
-  root = SD.open("/");
-  String fileID = "";
-  int numFiles = fileCount(root,dateTime);
-  if (numFiles >= 10){
-    numFiles += 55;
-    fileID = String(char(numFiles));
-  }
-  else{
-    fileID = String(numFiles);
-  }
-  fileName = dateTime + "_" + fileID + ".csv";
-  root.close();
+  fileName = DATA_FILE_NAME + String(dataFileCount) + ".csv";
 
+  while (SD.exists(fileName)){
+    dataFileCount++;
+    fileName = DATA_FILE_NAME + String(dataFileCount) + ".csv";
+  }
 }
 
 /*
@@ -286,9 +300,10 @@ void DataLogger::logNewName(){
   // so you have to close this one before opening another.
   File root;
   root = SD.open("/");
-  logName = "LOG" + String(fileCount(root,"LOG")) + ".txt";
+  logName = LOG_FILE_NAME + String(logFileCount) + ".txt";
   root.close();
 }
+
 /*
  * opens one of the file objects associated with current data stream
  */
@@ -296,11 +311,14 @@ File DataLogger::fileOpen(int option){
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
   if (!status){
-    if (option == 1){
+    if (option == FILE_TYPE_BACKUP){
       return SD.open(TEMP_DATA);
     }
-    else if (option == 2) {
+    else if (option == FILE_TYPE_LOG) {
       return SD.open(logName);
+    }
+    else if (option == FILE_TYPE_STATUS) {
+      return SD.open(fileName);
     }
     else{
       return SD.open(fileName);
