@@ -28,11 +28,8 @@
 
 #define K96_BAUD        115200
 #define K96_TIMEOUT     200
-#define K96_CMD_SIZE    7
-#define K96_DATA_SIZE   13
-#define K96_DATA_RAW    10
 
-#define BOARD               2
+#define BOARD               0
 
 #if BOARD == 0
   #define K96_POWER      5      // Device enable pin
@@ -55,20 +52,13 @@ class k96Modbus
 {
 private:
     
-    // Command structure: first two bytes x68, x44
-    //                    third byte is function
-    //                    fourth byte is address
-    //                    fifth byte is "read" count
-    //                    last two bytes are "Modbus" crc codes
-    // CRC Code Generator: https://www.lammertbies.nl/comm/info/crc-calculation
-    
-    char command[63] = {0x68,0x44,0x00,0x00,0x14,0x51,0x36,   // Read twenty (20) bytes of data
-                        0x68,0x44,0x00,0x1C,0x02,0xD8,0x38,   // Read two (2) bytes
-                        0x68,0x44,0x03,0xA4,0x02,0x5A,0x38,   // Read two (2) bytes
-                        0x68,0x44,0x04,0x24,0x02,0x8A,0x39,   // Read two (2) bytes
-                        0x68,0x44,0x04,0xA4,0x02,0xEB,0xF9,   // Read two (2) bytes
-                        0x68,0x44,0x00,0x28,0x04,0x4E,0xFA,   // Read four (4) bytes
-                        0x68,0x44,0x00,0x62,0x04,0x79,0x9A};  // Read four (4) bytes
+    char command[63] = {0x68,0x44,0x00,0x00,0x0E,0xD0,0xFD,
+                        0x68,0x44,0x00,0x1C,0x02,0xD8,0x38,
+                        0x68,0x44,0x03,0xA4,0x02,0x5A,0x38,
+                        0x68,0x44,0x04,0x24,0x02,0x8A,0x39,
+                        0x68,0x44,0x04,0xA4,0x02,0xEB,0xF9,
+                        0x68,0x44,0x00,0x28,0x04,0x4E,0xFA,
+                        0x68,0x44,0x00,0x62,0x04,0x79,0x9A};
       
     String labels[9] = {"<br>CH4: ","<br>CO2: ","<br>H2O: ","<br>Pressure: ","<br>T0: ",
                         "<br>T1: ", "<br>T2: ", "<br>Humidity: ", "<br>T3: "};
@@ -92,8 +82,8 @@ public:
     int readResponse();
     long readResponseLong(); 
     int readResponse(int numBytes);    
-    int writeCommand(int byteAddress);
-    int readCSVString(String& output);  
+    void writeCommand(int byteAddress);
+    String readCSVString();  
     String readByteString(int byteAddress);
     String getDeviceID();
     String readSensorFW();

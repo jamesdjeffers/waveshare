@@ -7,7 +7,6 @@
 
 import serial
 import time
-import secrets
 
 TIMEOUT_DEFAULT=0.2
 
@@ -23,11 +22,29 @@ def initCom():
     except:
         print('Com Port did not initialize.\n1. Check device power\n2. Check cable')
 
+def send_at(command,back,timeout):
+	rec_buff = ''
+	ser.write((command+'\r\n').encode())
+	time.sleep(timeout)
+	if ser.inWaiting():
+		time.sleep(0.01 )
+		rec_buff = ser.read(ser.inWaiting())
+	if rec_buff != '':
+		if back not in rec_buff.decode():
+			print(command + ' ERROR')
+			print(command + ' back:\t' + rec_buff.decode())
+			return 0
+		else:
+			print(rec_buff.decode())
+			return 1
+	else:
+		print('GPS is not ready')
+		return 0
+
 def readWait(back, responseDelay):
     ser.timeout = TIMEOUT_DEFAULT
-    opTimeStart = time.time()
     rec_buff = ser.read_until('\n',1024)
-    while (back.encode() not in rec_buff) and (b'ERROR' not in rec_buff) and ((time.time() - opTimeStart) < responseDelay):
+    while (back.encode() not in rec_buff) and (b'ERROR' not in rec_buff):
         if len(rec_buff) > 1:
             print (rec_buff.decode())
         rec_buff = ''
@@ -38,7 +55,6 @@ def readWait(back, responseDelay):
     return string
 
 def readWaitResponse(string, back, responseDelay):
-    opTimeStart = time.time()
     rec_buff=''
     ser.write((string+'\r\n').encode())
     ser.timeout = TIMEOUT_DEFAULT
@@ -46,7 +62,7 @@ def readWaitResponse(string, back, responseDelay):
     if len(rec_buff) > 1:
         test = 3
         print (rec_buff.decode())
-    while (back.encode() not in rec_buff) and (b'ERROR' not in rec_buff) and ((time.time() - opTimeStart) < responseDelay):
+    while (back.encode() not in rec_buff) and (b'ERROR' not in rec_buff):
         if len(rec_buff) > 1:
             print (rec_buff.decode())
         rec_buff = ''
@@ -71,28 +87,28 @@ def modemInit():
     print('SIM7080X is starting:')
     ser.flushInput()
     readResponse('AT',0)
-    readResponse('AT+CFUN=0',0)                             # Disable device RF
+    readResponse('AT+CFUN=0',0)
     readResponse('AT+CPIN',0)
+    readResponse('AT+CGDCONT=1,"IPV4V6","attiotdemo"',0)
+    readResponse('AT+CBANDCFG="CAT-M",2,4,12',0)
     
-    readResponse('AT+CGDCONT=1,"IPV4V6","attiotdemo"',0)    # Using profile 1
-    readResponse('AT+CBANDCFG="CAT-M",2,4,12',0)            # ATT 4G network configuration    
-    readResponse('AT+COPS=0,2,"310410"',0)                  # ATT 4G network configuration
-
+    
+    readResponse('AT+COPS=0,2,"310410"',0)
     readResponse('AT+COPS?',0)
-    readResponse('AT+CNCFG=0,2,"attiotdemo"',0)             # Using profile 2
+    readResponse('AT+CNCFG=0,2,"attiotdemo"',0)
     readResponse('AT+CNCFG?',0)
-    readResponse('AT+CFUN=1',0)                             # Enable device RF
-    time.sleep(3)                                           # Wait for device to detect network
-    readResponse('AT+CGDCONT=1,"IPV4V6","attiotdemo"',0)    # Repeat commands (don't know why)
+    readResponse('AT+CFUN=1',0)
+    time.sleep(3)
+    readResponse('AT+CGDCONT=1,"IPV4V6","attiotdemo"',0)
     readResponse('AT+CBANDCFG="CAT-M",2,4,12',0)
     
     readResponse('AT+COPS?',0)
-    readResponse('AT+COPS=0,2,"310410"',0)                  # Repeat commands (dont' know why)
+    readResponse('AT+COPS=0,2,"310410"',0)
     readResponse('AT+CNCFG=0,2,"attiotdemo"',0)
     readResponse('AT+CNCFG?',0)
-    readResponse('AT+CNACT=1,1',0)                          # Connect to network
-    readResponse('AT+CNACT?',0)                             # Check connection
-    readResponse('AT+CSQ',0)                                # Check signal strength
+    readResponse('AT+CNACT=1,1',0)
+    readResponse('AT+CNACT?',0)
+    readResponse('AT+CSQ',0)
 
 def modemInit2():
     print('SIM7080X is starting:')
@@ -162,9 +178,11 @@ def modemHTTPSRead():
     try:
         readResponse('AT+CNACT?',0)
         readResponse('AT+CSSLCFG="sslversion",1,3',0)
+        #readResponse('AT+SHSSL=1,"httpbin_root_ca.cer"')
         readResponse('AT+SHSSL=1,""',0)
         
         readResponse('AT+SHCONF="URL","https://www.google.com"',0)
+        
         
         readResponse('AT+SHCONN',5)
         readResponse('AT+SHSTATE?',0)
@@ -185,8 +203,9 @@ def modemEmailCount():
                 
     readResponse('AT+EMAILCID=1',0)
     readResponse('AT+EMAILTO=30',0)
+    #readResponse('AT+EMAILSSL=1,1,"email.cer","email.pem"',0)
     readResponse('AT+EMAILSSL=1,1,"",""',0)
-    readResponse('AT+POP3SRV="","","",995',0)
+    readResponse('AT+POP3SRV="pop.gmail.com","okdroneimage@gmail.com","ikcyolkmvfvbjcuu",995',0)
         
     readResponse('AT+POP3IN',5)
     readResponse('AT+POP3NUM',5)
@@ -196,12 +215,12 @@ def modemEmailSend():
     readResponse('AT+EMAILCID=1',0)
     readResponse('AT+EMAILTO=30',0)
     readResponse('AT+EMAILSSL?',0)
-    readResponse('AT+SMTPSRV="",465',0)
-    readResponse('AT+SMTPAUTH=1,"",""',0)
+    readResponse('AT+SMTPSRV="smtp.gmail.com",465',0)
+    readResponse('AT+SMTPAUTH=1,"okdroneimage@gmail.com","ikcyolkmvfvbjcuu"',0)
      
-    readResponse('AT+SMTPFROM="",""',0)
+    readResponse('AT+SMTPFROM="okdroneimage@gmail.com","okdroneimage"',0)
     readResponse('AT+SMTPSUB="Test"',0)
-    readResponse('AT+SMTPRCPT=0,0,"",""',0)
+    readResponse('AT+SMTPRCPT=0,0,"okdroneimage@gmail.com","okdroneimage"',0)
     readResponse('AT+SMTPBODY=19',0)
     time.sleep(0)
     readResponse('This is a new Email',0)
@@ -274,24 +293,27 @@ def modemFTPSConfig():          # Configure FTP server for encrypted communicati
 def modemFTPList():          # Read the contents of the FTP server directory
     
     opTimeStart = time.time()
-    print('FTP Directory List')
-    response = readWaitResponse('AT+FTPLIST=1','FTPLIST:',10)
+    print('The worst')
+    response = readWaitResponse('AT+FTPLIST=1','FTPLIST:',1)
+    print('The best')
     index = response.find("1,")
+    print(index)
     if (response == 'ERROR'):
         print('FTP List Error')
     elif (index >= 0):
         code = int(response[index+2:len(response)])
+        print(code)
         if (code == 0):
-            print('FTP Directory List Waiting')
-        elif (code == 1):      
+            print('Waiting')
+        elif (code == 1):
+            print('FTP Directory List')      
             #readWaitResponse('AT+FTPLIST=2,1024','FTPLIST: 1,0',1)
-            print('Reading ...')
-            response = readWaitResponse('AT+FTPLIST=2,1024','FTPLIST: ',10)
+            response = readWaitResponse('AT+FTPLIST=2,1024','FTPLIST: 2,',2)
             index = response.find("2,")
-            print('Done =', response)
-            if (index >= 0):
-                code = int(response[index+2:index+4])
-                print('Number of bytes = ', code)
+            if (index > 0):
+                print(response)
+                code = int(response[index+2:len(response)])
+                print('After response')
                 print(index)
                 if (code == 0):
                     print('Got zero')
@@ -301,24 +323,16 @@ def modemFTPList():          # Read the contents of the FTP server directory
                 #readWait('OK',1)
                 opTime = time.time()-opTimeStart
                 print(opTime)
-                readWait('FTPLIST: 1,0',30)
-                #readWaitResponse('AT+FTPQUIT','FTPLIST: 1,80',1)
+                readWaitResponse('AT+FTPQUIT','FTPLIST: 1,80',1)
                 opTime = time.time()-opTimeStart
                 print(opTime)
         elif (code == 62):
             print('FTP DNS Error')
-        elif (code == 65):
-            print('FTP Server Error')
-        elif (code == 77):
-            print('FTP Operation Error')
         else:
             print('FTP Error')
-    else:
-        print('FTP List Error',response)
 
-def modemFTPGet():          # Read a file on the FTP server
+def modemFTPGet():
        
-    print('Starting FTP GET:')
     opTimeStart = time.time()
     response = readWaitResponse('AT+FTPGET=1','FTPGET:',10)
     opTime = time.time()-opTimeStart
@@ -326,28 +340,22 @@ def modemFTPGet():          # Read a file on the FTP server
     readWaitResponse('AT+FTPGET=2,1024','OK',1)
     opTime = time.time()-opTimeStart
     print(opTime)
-    #readWait('FTPGET: 1,0',10)
     readWaitResponse('AT+FTPQUIT','FTPGET: 1,80',1)
     opTime = time.time()-opTimeStart
     print(opTime)
 
-def modemFTPPut():          # Write a file to the FTP server
+def modemFTPPut():
     
-    print('Starting FTP PUT:')
     opTimeStart = time.time()
-    readResponse('AT+FTPPUTOPT="STOR"',0)
-    response = readWaitResponse('AT+FTPPUT=1','FTPPUT:',3)  # Start the connection
-    print('Server connected ' + response)
-    readWaitResponse('AT+FTPPUT=2,12','FTPPUT: 2,12',5)
-    ser.write(('abc123456789').encode())
-    readWait('OK',20)
-    #readWait('FTPPUT: 1,1',20)
-    readWaitResponse('AT+FTPPUT=2,0','OK',3)
+    response = readWaitResponse('AT+FTPPUT=1','FTPPUT:',3)
+    readWaitResponse('AT+FTPPUT=2,5','FTPPUT: 2,5',3)
+    ser.write(('abc12').encode())
+    readWait('FTPPUT: 1,1',1)
+    readWaitResponse('AT+FTPPUT=2,0','OK',0)
     opTime = time.time()-opTimeStart
     print(opTime)
     #readWaitResponse('AT+FTPQUIT','FTPPUT: 1,80',1)
-    readWait('FTPPUT: 1,0',5)
-    #print(readWait('FTPPUT: ',5))
+    readWait('FTPPUT: 1,0',1)
     opTime = time.time()-opTimeStart
     print(opTime)
     
@@ -363,16 +371,22 @@ def main():
         
         readResponse('AT+CGATT?',0)
         readResponse('AT+CGDCONT?',0)
-        readResponse('AT+CBANDCFG?',0)  # Check 4G network configuration
+        readResponse('AT+CBANDCFG?',0)
         readResponse('AT+COPS?',0)
         readResponse('AT+CNCFG?',0)
-        readResponse('AT+CNACT?',0)     # Check ACTive 4G network connection
+        #send_at('AT+CGNSPWR=0','OK',1)
+        #readResponse('AT+CNACT=1,0',0)
         
-        readResponse('AT+CNACT=1,1',0)  # ACTivate connection to 4G network
-
-        readResponse('AT+CSQ',0)        # read Signal Quality
+        #readResponse('AT+CNACT=0,1',0)
+        readResponse('AT+CNACT=1,1',0)
         
-        print("Waiting...")
+        readResponse('AT+CNACT=1,1',0)
+        
+        readResponse('AT+CNACT=1,1',0)
+        
+        readResponse('AT+CNACT=1,1',0)
+        readResponse('AT+CSQ',0)
+        #time.sleep(75)
         time.sleep(3)
         
         modemClock()                    # use NTP server to set real-time clock
@@ -396,8 +410,8 @@ def main():
     except :
         print('SimCom function failed.')
 
-    #readResponse('AT+SHDISC',0)        # Disconnect from 4G network
-    #readResponse('AT+CNACT=1,0',0)
+    #readResponse('AT+SHDISC',0)
+    readResponse('AT+CNACT=1,0',0)
     ser.close()
     
 if __name__ == '__main__':

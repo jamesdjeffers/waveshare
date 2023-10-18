@@ -39,7 +39,7 @@ int wifiDataInit(){
 //    return 1;
 //  }
 //  else{
-//  CONFIGURE;
+    CONFIGURE;
     status = WiFi.beginAP(ssid);
     if (status != WL_AP_LISTENING) {
       return 2;

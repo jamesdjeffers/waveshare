@@ -42,9 +42,6 @@
 #include "DataLogger.h"
 #include "GPSSerial.h"
 
-#define DEVICE_ENABLED      1
-#define DEVICE_DISABLED     -1
-
 #define INTERVAL_DATA_MAX   900000
 #define INTERVAL_DATA_MIN   20000
 #define INTERVAL_FTP_MAX    900000
@@ -85,16 +82,14 @@ int statusModem = DEVICE_ENABLED;         // Tracks current state of modem (0 = 
 int statusFTP = -1;                       // Tracks the number of consectutive FTP errors (0 = OK)
 
 k96Modbus k96;
-int statusSensor = DEVICE_ENABLED;
-
+int statusSensor = -1;
 DataLogger logger;
 int statusSD = DEVICE_ENABLED;
 bool fileSizeLimit = false;               // Number of bytes before a new file is created
 bool dataSizeLimit = false;               // Number of bytes stored locally before modem is activated
 
 GPSSerial gpsSerial;
-int statusGPS = DEVICE_DISABLED;
-
+int statusGPS = -1;
 int statusClock = 0;
 
 // Serial port parser
@@ -265,7 +260,7 @@ void loop() {
       Serial.print("Simcom 7070G RF Config = ");
       Serial.println(modem.readRFCfg());      
     }
-    else if (serialCommand == "c" || serialCommand == "time"){
+    else if (serialCommand == "c"){
       Serial.print("Simcom 7070G Date and Time = ");
       Serial.println(modem.readClock(0));
     }
@@ -280,7 +275,15 @@ void loop() {
       modem.powerToggle();
     }
     
-     
+    else if (serialCommand == "i"){
+      Serial.print("Simcom 7070G IP Address = ");
+      Serial.println(modem.readIP());
+    }
+    else if (serialCommand == "p"){
+      Serial.print("Simcom 7070G IP Ping = ");
+      Serial.println(modem.readIPPing());
+    }
+    
     else if (serialCommand == "1"){
       Serial.print("Simcom 7070G Disabled = ");
       Serial.println(modem.GPSOff());
@@ -312,18 +315,6 @@ void loop() {
       Serial.println("Simcom 7070G Network Activated = ");
       Serial.println(modem.enableIP());
     }
-    else if (serialCommand == "i"){
-      Serial.print("Simcom 7070G IP Address = ");
-      Serial.println(modem.readIP());
-    }
-    else if (serialCommand == "p"){
-      Serial.print("Simcom 7070G IP Ping = ");
-      Serial.println(modem.readIPPing());
-    }
-    else if (serialCommand == "clock"){
-      Serial.print("Simcom 7070G Time Server = ");
-      Serial.println(modem.readIPPing());
-    }
     //********************************************************************************
     // FTP Commands
     else if (serialCommand == "ftp start"){
@@ -344,11 +335,7 @@ void loop() {
     }
     else if (serialCommand == "ftp server"){
       Serial.print("Simcom 7070G FTP Set Server = ");
-      Serial.println(modem.ftpServer());
-    }
-    else if (serialCommand == "ftp filename"){
-      Serial.print("Simcom 7070G FTP Set File Name = ");
-      Serial.println(modem.ftpFile());
+      Serial.println(modem.ftpCID());
     }
     else if (serialCommand == "ftp status"){
       Serial.print("Simcom 7070G FTP Status:");
@@ -394,10 +381,6 @@ void loop() {
       //gps.encode(modem.readGPS());
       Serial.print("GPS Serial Time = ");
       Serial.println(gpsSerial.time());
-    }
-    //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    else{
-      Serial.println("Unknown Command = " + serialCommand);
     }
     
   }
@@ -674,13 +657,3 @@ int writeStatus(){
          ",intervalCfg=" + String(intervalCfg) + ",intervalLog=" + String(intervalLog)+ 
          ",intervalBackup=" + String(intervalBackup);
  }
-
-// Status LED
-void opCode(int blinks){
-  for (int i =0; i < blinks; i++){
-    digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
-    delay(50);                         // wait for a second
-    digitalWrite(LED_BUILTIN, LOW);
-    delay(50);
-  }
-}

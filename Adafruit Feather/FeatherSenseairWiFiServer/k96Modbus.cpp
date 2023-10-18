@@ -111,71 +111,35 @@ int k96Modbus::readResponse(int numBytes){
   k96_memory[3] = wordS16(test[9],test[10]);
   k96_memory[4] = wordS16(test[11],test[12]);
   k96_memory[5] = wordS16(test[13],test[14]);
-  k96_memory[6] = wordS16(test[15],test[16]);
-  k96_memory[7] = wordS16(test[17],test[18]);
-  k96_memory[8] = wordS16(test[19],test[20]);
-  k96_memory[9] = wordS16(test[21],test[22]);
   return responseBytes;
 }
 
-/***********************************************
- * Serial Write Operation
- * 
- * Writes seven (7) bytes of data to serial port
- * 
- * ERROR: Serial port write will block if data is not received
- *        Check for avaialable buffer size
- * 
-************************************************/
-
-int k96Modbus::writeCommand(int byteAddress){
-  if (sensorSerial.availableForWrite() >= K96_CMD_SIZE){
-    for(int i=0; i < K96_CMD_SIZE; i++){
-      sensorSerial.write(command[i+7*byteAddress]);
-    }
-    return 0;
+void k96Modbus::writeCommand(int byteAddress){
+  for(int i=0; i<7; i++){
+    sensorSerial.write(command[i+7*byteAddress]);
   }
-  return 1;
 }
 
-/*
- * Format data into comma seperated value string
- */
-int k96Modbus::readCSVString(String& output){
+String k96Modbus::readCSVString(){
   String dataString = "";
-  if (!writeCommand(0)){
-    int readStatus = readResponse(20);
-  
-    if(readStatus > 20){
-      for(int i=0; i<K96_DATA_RAW; i++){
-        dataString += (String(k96_memory[i]) + ',');
-      }
-      
-      // Read the error status byte
-      writeCommand(1);
-      k96_memory[K96_DATA_RAW] = readResponse();
-      dataString += (String(k96_memory[K96_DATA_RAW]) + ',');
-      
-      for(int i=2; i<5; i++){
-        writeCommand(i);
-        k96_memory[(i-2)+ K96_DATA_RAW + 1] = readResponse();
-        dataString += (String(k96_memory[(i-2)+ K96_DATA_RAW + 1])+',');
-      }
-      //return dataString;
-      output.concat(dataString);
-      return 0;
+  writeCommand(0);
+  int readStatus = readResponse(14);
+  if(readStatus > 14){
+    for(int i=0; i<6; i++){
+      dataString += (String(k96_memory[i]) + ',');
     }
-    else if (readStatus > 0){
-      output.concat("Error,"+String(readStatus)+",bytes,read,-,-,-,");
-      return 1;
+    writeCommand(1);
+    k96_memory[6] = readResponse();
+    dataString += (String(k96_memory[6]) + ',');
+    for(int i=2; i<5; i++){
+      writeCommand(i);
+      k96_memory[i+5] = readResponse();
+      dataString += (String(k96_memory[i+5])+',');
     }
-    output.concat("Error,No,Sensor,Data,-,-,-,-,-,-,");
-    return 2;
+    return dataString;
   }
-  
   else{
-    output.concat("Error,No,Sensor,Serial,Port,-,-,-,-,");
-    return 3;
+    return "bytes,"+String(readStatus)+",-,-,-,-,-,-,-,-,";
   }
   
 }

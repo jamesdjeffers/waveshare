@@ -132,13 +132,9 @@ int DataLogger::fileCheckSize(){
  *  Add a single line of text to a new/existing file
  */
 int DataLogger::fileAddCSV(String csvString, int option){
-  
-  // SD card is enabled but in error (could have been removed) try to reinitialize
-  if (status > 0){
-    init();
-  }
-  // Previous section could have reset the status variable
-  if (status == 0){
+  // open the file. note that only one file can be open at a time,
+  // so you have to close this one before opening another.
+  if (!status){
     File dataFile;
 
     // if the file is available, write to it, else log error
@@ -147,9 +143,7 @@ int DataLogger::fileAddCSV(String csvString, int option){
       if (dataFile) {
         dataFile.println(csvString);
         dataFile.close();
-      }
-      else{
-        status = 1;
+        return 0;
       }
     }
     
@@ -159,9 +153,7 @@ int DataLogger::fileAddCSV(String csvString, int option){
       if (dataFile) {
         dataFile.println(csvString);
         dataFile.close();
-      }
-      else{
-        status = 1;
+        return 0;
       }
     }
     else if (option == FILE_TYPE_LOG){
@@ -170,9 +162,7 @@ int DataLogger::fileAddCSV(String csvString, int option){
       if (dataFile) {
         dataFile.println(csvString);
         dataFile.close();
-      }
-      else{
-        status = 1;
+        return 0;
       }
     }
     // Status file, contains info on last network and data file operations
@@ -189,7 +179,7 @@ int DataLogger::fileAddCSV(String csvString, int option){
       }
     }
   }
-  return status;    
+  return -1;    
 }
 
 /*
