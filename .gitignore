@@ -3,3 +3,6 @@ Adafruit Feather/FeatherSenseairWiFiServer/secrets.h
 *.csv
 *.txt
 Python/secrets.py
+*.pem
+*.crt
+*.key

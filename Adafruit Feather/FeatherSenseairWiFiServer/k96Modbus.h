@@ -28,8 +28,9 @@
 
 #define K96_BAUD        115200
 #define K96_TIMEOUT     200
+#define K96_DATA_SIZE   9
 
-#define BOARD               0
+#define BOARD               2
 
 #if BOARD == 0
   #define K96_POWER      5      // Device enable pin
@@ -83,7 +84,10 @@ public:
     long readResponseLong(); 
     int readResponse(int numBytes);    
     void writeCommand(int byteAddress);
-    String readCSVString();  
+    
+    String readCSVString();
+    int readCSVString(String &resultString);
+      
     String readByteString(int byteAddress);
     String getDeviceID();
     String readSensorFW();

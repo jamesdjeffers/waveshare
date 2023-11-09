@@ -50,6 +50,8 @@ int SimModem::init()
   pinMode(MODEM_POWER,OUTPUT);
   digitalWrite(MODEM_POWER,LOW);
   delay(1000);
+
+  Serial.println("init");
   
   // Enable the modem (do not cycle the power if not needed)
   if (!startSession()){
@@ -100,15 +102,21 @@ String SimModem::readWaitResponse(String command, int waitTime, String back){
   
   String responseString = "";
   String bytesReady = "";
+
+  Serial.println("broken");
   
   SimModemSerial.flush();
+  Serial.println("broken");
   SimModemSerial.println(command);
+
+  Serial.println("broken");
 
   if (waitTime){    SimModemSerial.setTimeout(waitTime);  }
   else {            SimModemSerial.setTimeout(modemTimeout);  }
 
   int bufferLength = SimModemSerial.readBytesUntil('\n',buffer, MODEM_BUFFER);
   while (bufferLength > 0){
+    Serial.println(bufferLength);
     bufferLength = SimModemSerial.readBytesUntil('\n',buffer, MODEM_BUFFER);
     responseString = String(buffer);
     responseString = responseString.substring(0,bufferLength);
@@ -374,38 +382,33 @@ String SimModem::readIMEI(){
  * Date format is YY/MM/DD
  */
 String SimModem::readClock(int format){
-  String dateTimeResponse = readWaitResponse(AT_TIME,0,"CCLK:");
-  if (dateTimeResponse == "test"){
-    powerOn();
-    enableIP();
-    dateTimeResponse = readWaitResponse(AT_TIME,0,"CCLK:");
-    if (dateTimeResponse == ""){
-      return "Clock, Error";
+  if (checkStatus() >= 0){
+    String dateTimeResponse = readWaitResponse(AT_TIME,100,"CCLK:");
+  
+    int startIndex = dateTimeResponse.indexOf("\"");
+    int endIndex = dateTimeResponse.indexOf("\"",startIndex+1);
+    if (format == 0){
+      return dateTimeResponse.substring(startIndex+1, dateTimeResponse.indexOf("-",startIndex));
+    }
+    else if (format == 1){
+      dateTimeResponse = dateTimeResponse.substring(startIndex+1, dateTimeResponse.indexOf(",",startIndex));
+      dateTimeResponse.replace("/","");
+      return dateTimeResponse;
+    }
+    else {
+      dateTimeResponse = dateTimeResponse.substring(startIndex+1, dateTimeResponse.indexOf("-",startIndex));
+      Serial.println(dateTimeResponse);
+      dateTimeResponse.replace("/","");
+      Serial.println(dateTimeResponse);
+      dateTimeResponse.replace(",","_");
+      Serial.println(dateTimeResponse);
+      dateTimeResponse.replace(":","");
+      Serial.println(dateTimeResponse);
+      return dateTimeResponse;
     }
   }
-  else if (dateTimeResponse == "ERROR"){
-    return "ERROR";
-  }
-  int startIndex = dateTimeResponse.indexOf("\"");
-  int endIndex = dateTimeResponse.indexOf("\"",startIndex+1);
-  if (format == 0){
-    return dateTimeResponse.substring(startIndex+1, dateTimeResponse.indexOf("-",startIndex));
-  }
-  else if (format == 1){
-    dateTimeResponse = dateTimeResponse.substring(startIndex+1, dateTimeResponse.indexOf(",",startIndex));
-    dateTimeResponse.replace("/","");
-    return dateTimeResponse;
-  }
-  else {
-    dateTimeResponse = dateTimeResponse.substring(startIndex+1, dateTimeResponse.indexOf("-",startIndex));
-    Serial.println(dateTimeResponse);
-    dateTimeResponse.replace("/","");
-    Serial.println(dateTimeResponse);
-    dateTimeResponse.replace(",","_");
-    Serial.println(dateTimeResponse);
-    dateTimeResponse.replace(":","");
-    Serial.println(dateTimeResponse);
-    return dateTimeResponse;
+  else{
+    return "none";
   }
 }
 

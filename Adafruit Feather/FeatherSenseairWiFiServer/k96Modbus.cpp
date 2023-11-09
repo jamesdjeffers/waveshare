@@ -144,6 +144,31 @@ String k96Modbus::readCSVString(){
   
 }
 
+// Updated string read
+int k96Modbus::readCSVString(String &dataString){
+  writeCommand(0);
+  int readStatus = readResponse(14);
+  if(readStatus > 14){
+    for(int i=0; i<6; i++){
+      dataString += (String(k96_memory[i]) + ',');
+    }
+    writeCommand(1);
+    k96_memory[6] = readResponse();
+    dataString += (String(k96_memory[6]) + ',');
+    for(int i=2; i<5; i++){
+      writeCommand(i);
+      k96_memory[i+5] = readResponse();
+      dataString += (String(k96_memory[i+5])+',');
+    }
+    return 0;
+  }
+  else{
+    dataString += "Error,No,Sensor,Data";
+    return 1;
+  }
+  
+}
+
 /*
  * Returns
  */

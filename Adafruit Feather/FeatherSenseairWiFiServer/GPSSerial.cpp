@@ -41,14 +41,14 @@ int GPSSerial::init(){
   
   gps2Serial.begin(GPS_BAUD);
   gps2Serial.setTimeout(GPS_TIMEOUT);
-  pinPeripheral(GPS_RX, PIO_SERCOM); //Assign RX function to pin 11
-  pinPeripheral(GPS_TX, PIO_SERCOM); //Assign TX function to pin 10
+  pinPeripheral(GPS_RX, PIO_SERCOM);        // Assign RX function, constant stream
+  pinPeripheral(GPS_TX, PIO_SERCOM);        // Assign TX function, unused
   delay(500);
   if (gps2Serial.available() > 0){
-    return 0;
+    return 0;                               // Stream should begin immediately
   }
   else{
-    return -1;
+    return -1;                              // No data = no device
   }
 }
 

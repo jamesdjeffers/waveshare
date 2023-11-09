@@ -3,7 +3,7 @@
  *  Creates an external interface and stores data from serial sensor devices
  *  Currently works with Adalogger SD card, FeatherWing WiFi, and Simcom 7080G modem
  *  System has optional data acquisition from a serial GPS device
- *  1. Check for web page request
+ *  1. 
  *  2. Check for serial port input
  *  3. Data acquisition check
  *  3a. Check timer
@@ -16,7 +16,8 @@
  *  4c. Download settings file if timer check
  *  
  * Written by James D. Jeffers 2022/06/30
- * Copyright (c) 2022 University of Oklahoma.  All right reserved.
+ * Updated 2023/10/23
+ * Copyright (c) 2023 University of Oklahoma.  All right reserved.
 
   This library is free software; you can redistribute it and/or
   modify it under the terms of the GNU Lesser General Public
@@ -33,11 +34,11 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#define SW_VER_NUM          "Firmware v0.9.1"
+#define SW_VER_NUM          "Firmware v0.9.2"
 #include "secrets.h"
 
+#include "SystemControl.h"
 #include "k96Modbus.h"
-#include "WifiData.h"
 #include "SimModem.h"
 #include "DataLogger.h"
 #include "GPSSerial.h"
@@ -54,6 +55,9 @@
 #define INTERVAL_LOG_MIN    60000
 
 #define SERIAL_BUFFER       1024
+
+#define DEVICE_ENABLED      0
+#define DEVICE_DISABLED     1
 
 String dataString = "";
 
@@ -73,23 +77,29 @@ int intervalBackup = 0;                   // Backup the data file every 15 minut
 int LastFileUpload = 0;
 int lastFTPByteBackup = 0;
 
-int intervalLog = 3600000;                // Update the system event log every 60 minutes
+int intervalLog = 0;                // Update the system event log every 60 minutes
 int timerLastLog = 0;                     // Timer value in milliseconds for last log FTP
 int lastFTPByteLog = 0;                   // Number of bytes current log succussful FTP
+
+SystemControl control;
+int powerSave = 0;                        // Track the ability to turn off the modem bewteen uploads
 
 SimModem modem;
 int statusModem = DEVICE_ENABLED;         // Tracks current state of modem (0 = OK)
 int statusFTP = -1;                       // Tracks the number of consectutive FTP errors (0 = OK)
+bool logModemTime = true;
+bool logModemPower = true;
 
 k96Modbus k96;
 int statusSensor = -1;
+
 DataLogger logger;
 int statusSD = DEVICE_ENABLED;
 bool fileSizeLimit = false;               // Number of bytes before a new file is created
 bool dataSizeLimit = false;               // Number of bytes stored locally before modem is activated
 
 GPSSerial gpsSerial;
-int statusGPS = -1;
+int statusGPS = DEVICE_ENABLED;
 int statusClock = 0;
 
 // Serial port parser
@@ -106,13 +116,13 @@ char serialBuffer[SERIAL_BUFFER] = "";
 void setup() {
   
   Serial.begin(115200);                   // Initialize serial port for USB connections
-  pinMode(LED_BUILTIN, OUTPUT);           // Use builtin LED for status blinking
-  delay(1000);
+  Serial.println("OU Nananophotonics Lab: Project AIMNet");
 
   /* Device 1: SD card 1111111111111111111111111111111111111111111111111111111111*/
   if (statusSD == DEVICE_ENABLED){
     statusSD = logger.init();
     if (!statusSD){
+      Serial.println("SD Card Initialized");
       logger.fileRemove(1);
       logger.logNewName();
       logger.fileAddCSV("**********************************************",2);
@@ -123,6 +133,7 @@ void setup() {
         writeStatus();
       }
     }
+    Serial.println("SD Card failed");
   }
   
   /* Device 2: Modem 2222222222222222222222222222222222222222222222222222222222222*/
@@ -139,15 +150,18 @@ void setup() {
   /* Device 3: Chemical sensor 11111111111111111111111111111111111111111111111111111111111111*/
   statusSensor = k96.init();
   if (!statusSensor){
+    Serial.println("Sensor initialized");
     logger.fileAddCSV((modem.readClock(0)+": K96 Sensor = " + k96.getDeviceID()+" Firmware = " + k96.readSensorFW()),FILE_TYPE_LOG);
   }
   else {
     logger.fileAddCSV("Sensor Failed",FILE_TYPE_LOG);
+    Serial.println("Sensor failed");
   }
 
   // Create a data acquisition file based on the date
   if (!statusSD){
     logger.fileNewName();
+    Serial.println("nah");
     logger.fileAddCSV((modem.readClock(0)+": Data acquisition file = " + logger.fileNameString()),FILE_TYPE_LOG);
   }
   
@@ -161,6 +175,17 @@ void setup() {
       lastFTPByteLog = tempFile.size();
     }
     tempFile.close();
+  }
+
+  /* Device 4: GPS sensor   */
+  if (statusGPS == DEVICE_ENABLED){
+    statusGPS = gpsSerial.init();
+    if (!statusGPS){
+      Serial.println("GPS Module initialized");
+    }
+    else{
+      Serial.println("GPS Module failed");
+    }
   }
 
 }
@@ -202,6 +227,45 @@ void loop() {
       intervalData = serialCommand.substring(2,serialDataSize).toInt();
       Serial.print("New data rate:");
       Serial.println(intervalData);
+    }
+    else if (serialCommand.startsWith("power save")){
+      powerSave = 1;
+      Serial.print("Power Save Mode enabled");
+    }
+    else if (serialCommand.startsWith("power use")){
+      powerSave = 0;
+      Serial.print("Power Save Mode disabled");
+    }
+
+    //********************************************************************************
+    // Power System commands
+    else if (serialCommand == "fan on"){
+      control.enablePower(0);
+      Serial.println("Fan enabled");
+    }
+    else if (serialCommand == "pump on"){
+      control.enablePower(1);
+      Serial.println("Pump enabled");
+    }
+    else if (serialCommand == "gps on"){
+      control.enablePower(2);
+      Serial.println("GPS enabled");
+    }
+    else if (serialCommand == "fan off"){
+      control.disablePower(0);
+      Serial.println("Fan disabled");
+    }
+    else if (serialCommand == "pump off"){
+      control.disablePower(1);
+      Serial.println("Pump disabled");
+    }
+    else if (serialCommand == "gps off"){
+      control.disablePower(2);
+      Serial.println("GPS disabled");
+    }
+    else if (serialCommand == "read aux"){
+      Serial.print("Read auxilliary input (max 1024): ");
+      Serial.println(control.readAux());
     }
 
     //********************************************************************************
@@ -373,11 +437,16 @@ void loop() {
       Serial.print("GPS Serial Value = ");
       Serial.println(gpsSerial.readResponse());
     }
-    else if (serialCommand == "gps_raw"){
+    else if (serialCommand == "gps reset"){
+      Serial.print("GPS Serial Value = ");
+      statusGPS = gpsSerial.init();
+      Serial.println(statusGPS);
+    }
+    else if (serialCommand == "gps raw"){
       Serial.print("GPS Serial Value = ");
       Serial.println(gpsSerial.readRaw());
     }
-    else if (serialCommand == "gps_time"){
+    else if (serialCommand == "gps time"){
       //gps.encode(modem.readGPS());
       Serial.print("GPS Serial Time = ");
       Serial.println(gpsSerial.time());
@@ -401,6 +470,15 @@ void loop() {
     int option = (intervalUpdate != 0);
     dataString = ',' + String(millis()/1000) + ',';
     int test = k96.readCSVString(dataString);                              // Sensor data
+    if (statusGPS == DEVICE_ENABLED){
+      dataString += "," + gpsSerial.readResponse();
+    }
+    if (logModemTime){
+      dataString += "," + modem.readClock(0);
+    }
+    if (logModemPower){
+      dataString += "," + modem.readSignal().substring(0,9);
+    }
   
 //SDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSD
 // Store the data on local SD card (can be disabled)
@@ -411,21 +489,21 @@ void loop() {
       fileSizeLimit = (logger.fileCheckSize() > FILE_MAX_SIZE);
       dataSizeLimit = ((logger.fileCheckSize() - lastFTPByteBackup) > DATA_MAX_SIZE) || fileSizeLimit;
       if (statusSD > 0){
-        opCode(3);
+        control.blinkCode(3);
       }
       else if (test != 0){
-        opCode(2);
+        control.blinkCode(2);
       }
       else {
-        opCode(1);
+        control.blinkCode(1);
       }
     }
     else{
       if (test != 0){
-        opCode(1);
+        control.blinkCode(1);
       }
       else if (statusSD > 0){
-        opCode(2);
+        control.blinkCode(2);
       }
     }
     
@@ -533,9 +611,9 @@ void loop() {
       }
       //POWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWERPOWER
       // If sufficient delay until next modem action, disable network connection
-      if (intervalUpdate >= 45000){
-        Serial.println("File Updated");
-        //modem.disableIP();
+      //if (powerSave && intervalUpdate >= 45000){
+      if (powerSave && intervalUpdate >= 45000){
+        modem.disableIP();
       }
   }    
 }
@@ -652,8 +730,8 @@ int writeStatus(){
  * Puts the system settings in a printable string
  */
 
- String settingsString(){
+String settingsString(){
   return "intervalData=" + String(intervalData) + ",intervalFTP=" + String(intervalUpdate) + 
          ",intervalCfg=" + String(intervalCfg) + ",intervalLog=" + String(intervalLog)+ 
          ",intervalBackup=" + String(intervalBackup);
- }
+}
