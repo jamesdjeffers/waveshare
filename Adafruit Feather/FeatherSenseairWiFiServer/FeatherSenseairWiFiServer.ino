@@ -151,7 +151,7 @@ void setup() {
   statusSensor = k96.init();
   if (!statusSensor){
     Serial.println("Sensor initialized");
-    logger.fileAddCSV((modem.readClock(0)+": K96 Sensor = " + k96.getDeviceID()+" Firmware = " + k96.readSensorFW()),FILE_TYPE_LOG);
+    logger.fileAddCSV((modem.readClock(0)+": K96 Sensor = " + k96.readSensorID()+" Firmware = " + k96.readSensorFW()),FILE_TYPE_LOG);
   }
   else {
     logger.fileAddCSV("Sensor Failed",FILE_TYPE_LOG);
@@ -450,6 +450,10 @@ void loop() {
       //gps.encode(modem.readGPS());
       Serial.print("GPS Serial Time = ");
       Serial.println(gpsSerial.time());
+    }
+    else {
+      Serial.print("Unknown Command: ");
+      Serial.println(serialCommand);
     }
     
   }

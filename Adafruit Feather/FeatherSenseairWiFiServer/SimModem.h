@@ -130,7 +130,7 @@ class SimModem
 private:
   
   char buffer [1360] = "";
-  int status = -3;                    // Contains operation mode data (-3 = unknown, -2 = startup, -1 = connecting, 0 = on)
+  int status = MODEM_STATUS_UNKNOWN;  // Contains operation mode data (-3 = unknown, -2 = startup, -1 = connecting, 0 = on)
   long timer = 0;                     // Used to track internal actions, stores millisecond timer
 
   String imei = "default";
