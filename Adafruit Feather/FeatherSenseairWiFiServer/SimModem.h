@@ -28,11 +28,13 @@
 #define MODEM_TIMER_POWER_ON      15000
 #define MODEM_TIMER_POWER_OFF     5000
 
-#define MODEM_STATUS_UNKNOWN    -3
-#define MODEM_STATUS_OFF        -2
-#define MODEM_STATUS_CONNECT    -1
-#define MODEM_STATUS_ON         0
-#define MODEM_STATUS_ERROR      1
+#define MODEM_STATUS_UNKNOWN      -3
+#define MODEM_STATUS_OFF          -2
+#define MODEM_STATUS_CONNECT      -1
+#define MODEM_STATUS_ON           0
+#define MODEM_STATUS_ERROR        1
+
+#define MODEM_CMD_DELAY           10
 
 #define MODEM_BUFFER 1360
 
@@ -57,10 +59,12 @@
 #define AT_NET_ACT "AT+CNACT?"
 
 #define AT_NET_0ON "AT+CNACT=0,1"
+#define AT_NET_0OF "AT+CNACT=0,0"
+
 #define AT_NET_1ON "AT+CNACT=1,1"
 #define AT_NET_1OF "AT+CNACT=1,0"
 
-#define AT_NTP_ID  "AT+CNTPCID=1"                    // ADP Configuration query
+#define AT_NTP_ID  "AT+CNTPCID=0"                    // ADP Configuration query
 #define AT_NTP_SET "AT+CNTP=\"time.nist.gov\",-24"    // NIST server, Time Zone
 #define AT_NTP_UP  "AT+CNTP"                        // Update the NTP server
 #define AT_TIME    "AT+CCLK?"                       // Dat and Time string query 
@@ -69,7 +73,7 @@
 #define AT_IP_PING IP_PING
 
 #define AT_FTP_EXT      "AT+FTPQUIT"
-#define AT_FTP_CID      "AT+FTPCID=1"
+#define AT_FTP_CID      "AT+FTPCID=0"
 #define AT_FTP_STA      "AT+FTPSTATE"
 #define AT_FTP_SRV      FTP_SERVER
 #define AT_FTP_UN       FTP_UN
@@ -80,6 +84,7 @@
 
 #define AT_FTP_SRV_QRY  "AT+FTPSERV?"
 #define AT_FTP_UN_QRY   "AT+FTPUN?"
+#define AT_FTP_PW_QRY   "AT+FTPPW?"
 
 #define AT_FTP_GET_NAM  "AT+FTPGETNAME=\"config.json\""
 #define AT_FTP_GET_PTH  "AT+FTPGETPATH=\"/incoming/binbin\""
@@ -119,6 +124,7 @@
 #define AT_MQT_UNS  "AT+SMUNSUB=\"information\""
 #define AT_MQT_DIS  "AT+SMDISC"
 #define AT_MQT_STA  "AT+SMSTATE"
+#define AT_MQT_CFG  "AT+SMCONF?"
 
 #include "secrets.h"
 #include <Arduino.h>        // required before wiring_private.h
@@ -193,6 +199,8 @@ public:
   String GPSOn();
   String GPSOff();
 
+  int mqttStatus();
+  int mqttConnect();
   int mqttPub();
   int mqttSub();
   int mqttUnsub();

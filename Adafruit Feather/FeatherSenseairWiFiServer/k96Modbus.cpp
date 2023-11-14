@@ -42,15 +42,14 @@ int k96Modbus::init(){
   sensorSerial.begin(K96_BAUD,SERIAL_8N2);
   sensorSerial.setTimeout(K96_TIMEOUT);
   if (BOARD == 0){
-    pinPeripheral(K96_TX, PIO_SERCOM); //Assign RX function to pin 11
-    pinPeripheral(K96_RX, PIO_SERCOM); //Assign TX function to pin 10
+    pinPeripheral(K96_TX, PIO_SERCOM);       // Assign TX function to pin
+    pinPeripheral(K96_RX, PIO_SERCOM);       // Assign RX function to pin
   }
   pinMode(K96_POWER,OUTPUT);
   digitalWrite(K96_POWER,HIGH);
   
-  readSensorID();
+  getDeviceID();                             // Read serial number, sets status
   return status;
-  
   
 }
 
@@ -221,8 +220,9 @@ String k96Modbus::readByteString(int byteAddress){
  * Returns: status
  */
 int k96Modbus::getDeviceID(){
-  writeCommand(5);                    // Command 5 for reading 4 bytes
-  deviceID = readResponseLong();      // Sets status variable if read = success
+  if (!writeCommand(5)){                    // Command 5 for reading 4 bytes
+    deviceID = readResponseLong();      // Sets status variable if read = success
+  } 
   return status;
 }
 

@@ -161,7 +161,6 @@ void setup() {
   // Create a data acquisition file based on the date
   if (!statusSD){
     logger.fileNewName();
-    Serial.println("nah");
     logger.fileAddCSV((modem.readClock(0)+": Data acquisition file = " + logger.fileNameString()),FILE_TYPE_LOG);
   }
   
@@ -324,9 +323,13 @@ void loop() {
       Serial.print("Simcom 7070G RF Config = ");
       Serial.println(modem.readRFCfg());      
     }
-    else if (serialCommand == "c"){
+    else if (serialCommand == "clock"){
       Serial.print("Simcom 7070G Date and Time = ");
       Serial.println(modem.readClock(0));
+    }
+    else if (serialCommand == "clock reset"){
+      Serial.print("Simcom 7070G Date and Time = ");
+      Serial.println(modem.startNTP());
     }
     
     else if (serialCommand == "init"){
@@ -420,15 +423,36 @@ void loop() {
         Serial.println("FTP Download Failed");
       }
     }
+    else if (serialCommand == "ftp log"){
+      Serial.print("Simcom 7070G FTP Put File = ");
+      File tempFile = logger.fileOpen(FILE_TYPE_LOG);
+      Serial.println(modem.ftpPut(tempFile,0));
+      tempFile.close();
+    }
     else if (serialCommand == "s"){
-      Serial.print("Simcom 7070G FTP Put File= ");
+      Serial.print("Simcom 7070G FTP Put File = ");
       File tempFile = logger.fileOpen(0);
       Serial.println(modem.ftpPut(tempFile,0));
       tempFile.close();
     }
     else if (serialCommand == "S"){
-      Serial.print("Simcom 7070G FTP Put Append Data= ");
+      Serial.print("Simcom 7070G FTP Put Append Data = ");
       Serial.println(modem.ftpPut(dataString));
+    }
+
+    //*********************************************************************************
+    // MQTT Commands
+    else if (serialCommand == "mqtt start"){
+      Serial.print("Simcom 7070G MQTT Start = ");
+      modem.startMQTT();
+    }
+    else if (serialCommand == "mqtt status"){
+      Serial.print("Simcom 7070G MQTT Status = ");
+      modem.mqttStatus();
+    }
+    else if (serialCommand == "mqtt connect"){
+      Serial.print("Simcom 7070G MQTT Connect = ");
+      modem.mqttConnect();
     }
 
     //*********************************************************************************

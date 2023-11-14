@@ -145,8 +145,10 @@ String SimModem::readBurst(String command, int waitTime, String back){
 
   memset(buffer, 0, sizeof buffer); 
   int bufferLength = SimModemSerial.readBytesUntil('\n',buffer, MODEM_BUFFER);
+  responseString = String(buffer);
   
   while (bufferLength > 0){
+    Serial.println(responseString);                                               // Only print lines without "back"
     bufferLength = SimModemSerial.readBytesUntil('\n',buffer, MODEM_BUFFER);
     responseString = String(buffer);
     
@@ -157,7 +159,7 @@ String SimModem::readBurst(String command, int waitTime, String back){
       bytesToRead = responseString.substring(responseString.indexOf(',')+1).toInt();
       return "";
     }
-    Serial.println(responseString);                                               // Only print lines without "back"
+    
   }
   
   if (bytesToRead){
@@ -313,39 +315,77 @@ int SimModem::startFTP(){
   if (responseString.indexOf("1") >= 0){
     responseString = readResponse(AT_FTP_EXT,100);
     Serial.println("FTP Session Active, Disabling");
-    delay(100);
+    delay(MODEM_CMD_DELAY);
   }
   Serial.println("FTP Session Configuration");
 
   responseString = readResponse(AT_FTP_CID,100);      // Set the internet connection ID (determined by typedef)
   Serial.println(responseString);
-  delay(100);
+  delay(MODEM_CMD_DELAY);
   responseString = readResponse(AT_FTP_SRV,100);      // Choose the FTP server (name or IP address)
   Serial.println(responseString);
-  delay(100);
+  delay(MODEM_CMD_DELAY);
   responseString = readResponse(AT_FTP_MOD,100);      // Choose the FTP connection mode (active vs. passive)
   Serial.println(responseString);
-  delay(100);
+  delay(MODEM_CMD_DELAY);
    responseString = readResponse(AT_FTP_TYP,100);      // Choose the FTP data type (ASCII vs. binary)
   Serial.println(responseString);
-  delay(100);
+  delay(MODEM_CMD_DELAY);
   responseString = readResponse(AT_FTP_UN,100);       // Set the username (do not leave blank, can be "anonymous")
   Serial.println(responseString);
-  delay(100);
-  responseString = readResponse(AT_FTP_PWD,100);
-  Serial.println(responseString);
-  delay(100);
+  delay(MODEM_CMD_DELAY);
+  //responseString = readResponse(AT_FTP_PWD,100);
+  //Serial.println(responseString);
+  //delay(MODEM_CMD_DELAY);
   responseString = readResponse(AT_FTP_PRT,100);
   Serial.println(responseString);
-  delay(100);
+  delay(MODEM_CMD_DELAY);
+  responseString = readResponse(AT_FTP_PUT_NEW,100);
+  Serial.println(responseString);
+  delay(MODEM_CMD_DELAY);
 
   readResponse(AT_FTP_GET_NAM,0);                     // Set the file name for "read" operations, includes list details
-  delay(100);
+  delay(MODEM_CMD_DELAY);
   readResponse(AT_FTP_GET_PTH,0);                     // Set the path for "read" operations, includes list
-  delay(100);
+  delay(MODEM_CMD_DELAY);
   readResponse(AT_FTP_PUT_PTH,0);                     // Set the path for "write" operations should end with folder separator
-  delay(100);
+  delay(MODEM_CMD_DELAY);
   
+  return 0;
+}
+
+/*
+ * Read GPS string
+ * No formatting
+ * Return NEMA string
+ */
+int SimModem::startMQTT(){
+  Serial.println(readResponse(MQTT_SERVER,0));
+  Serial.println(readResponse(MQTT_UN,0));
+  Serial.println(readResponse(MQTT_PWD,0));
+  Serial.println(readResponse(MQTT_ID,0));
+  Serial.println(readResponse(AT_MQT_TIM,0));
+  Serial.println(readResponse(AT_MQT_CSS,0));
+  return 0;
+}
+
+/*
+ * Read GPS string
+ * No formatting
+ * Return NEMA string
+ */
+int SimModem::mqttConnect(){
+  Serial.println(readResponse(AT_MQT_CON,1000));
+  return 0;
+}
+
+/*
+ * Read GPS string
+ * No formatting
+ * Return NEMA string
+ */
+int SimModem::mqttStatus(){
+  Serial.println(readResponse(AT_MQT_CFG,1000));
   return 0;
 }
 
@@ -390,13 +430,9 @@ String SimModem::readClock(int format){
     }
     else {
       dateTimeResponse = dateTimeResponse.substring(startIndex+1, dateTimeResponse.indexOf("-",startIndex));
-      Serial.println(dateTimeResponse);
       dateTimeResponse.replace("/","");
-      Serial.println(dateTimeResponse);
       dateTimeResponse.replace(",","_");
-      Serial.println(dateTimeResponse);
       dateTimeResponse.replace(":","");
-      Serial.println(dateTimeResponse);
       return dateTimeResponse;
     }
   }
@@ -456,7 +492,7 @@ String SimModem::readIPPing(){
  
 int SimModem::enableIP(){
   for (int i = 0; i<5; i++){
-    String string = readWaitResponse(AT_NET_1ON,2000,"PDP:");
+    String string = readWaitResponse(AT_NET_0ON,2000,"PDP:");
     
     if (string.indexOf("Active") >= 0){
       return 0;
@@ -505,7 +541,6 @@ String SimModem::ftpList(){
       // Response will indicate number of bytes ready to read
       // Value may be 0, requires command to be repeated
       responseString = readWaitResponse(AT_FTP_LRD,10000,"FTPLIST: 2,");
-      Serial.println(responseString);
       while(responseString.indexOf("0") == 0){
         responseString = readWaitResponse(AT_FTP_LRD,10000,"FTPLIST: 2,");
       }
@@ -559,28 +594,13 @@ int SimModem::ftpPut(File dataFile, int option){
   int numPuts = dataSize / 1360;
   int lastPutSize = dataSize % 1360;
   String lastPutString = AT_FTP_PWR + String(lastPutSize);
-  
+
+  Serial.print("FTP PUT Numbers: ");
+  Serial.print(numPuts);
+  Serial.println(lastPutSize);
   String putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + readClock(2) + "_" + dataFile.name() + String("\"");
-  
-  readResponse(putFileName,3000);
-  delay(1000);                                                          // BUG? requires delay between filename change and FTP store
-  
-   if (option == 0){
-    putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + dataFile.name() + String("\"");
-    readResponse(AT_FTP_PUT_APP,0);
-  }
-  else if (option == 1){
-    putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + dataFile.name() + String("\"");
-    readResponse(AT_FTP_PUT_APP,0);
-  }
-  else if (option == 2){
-    putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + "log.txt" + String("\"");
-    readResponse(AT_FTP_PUT_APP,0);
-  }
-  readResponse(putFileName,0);
-  readResponse(putFileName,3000);
-  Serial.println(putFileName);
-  delay(1000);
+  Serial.println(readWaitResponse(putFileName,3000,"OK"));
+  Serial.println(readResponse(AT_FTP_PUT_QNM,100));
 
   responseString = readWaitResponse(AT_FTP_PUT,3000,"FTPPUT:");         // Start FTP session
   Serial.println(responseString);
@@ -594,10 +614,11 @@ int SimModem::ftpPut(File dataFile, int option){
       Serial.println("Data Upload");
       responseString = readWaitResponse(AT_FTP_PWX,3000,"FTPPUT:");     // Wait for data ready acknowledgement
       if (responseString.indexOf("2,") < 0){                      // If transmission failed break loop
+        Serial.println(responseString);
         Serial.println("Error");
         break;
       }
-      for (int j = 0; j < lastPutSize; j++){
+      for (int j = 0; j < 1360; j++){
         temp = dataFile.read();
         SimModemSerial.print(temp);
       }
@@ -616,7 +637,7 @@ int SimModem::ftpPut(File dataFile, int option){
         SimModemSerial.flush();
     }
     responseString = readWaitResponse(AT_FTP_PDN,0,"OK");
-    //readResponse(AT_FTP_EXT,0);                                   // Disabled manaul disconnect (MIGHT USE AGAIN)
+    //readResponse(AT_FTP_EXT,0);                                   // Disabled manual disconnect (MIGHT USE AGAIN)
     if (responseString){
       return 0;
     }   
@@ -647,6 +668,7 @@ int SimModem::ftpPut(String dataString){
   Serial.println(readWaitResponse(AT_FTP_PUT,3000,"FTPPUT:"));
   responseString = readWaitResponse(putString,3000,"FTPPUT:");
   while (responseString.indexOf("1,0") >= 0){
+    Serial.print("FTP server delay");
     responseString = readWaitResponse(putString,3000,"FTPPUT:");
   }
     
@@ -700,6 +722,7 @@ String SimModem::RFOff(){
  * Simcom 7070G cannot operate GPS and modem at same time
  */
 String SimModem::disableIP(){
+  readResponse(AT_NET_0OF,0);
   return readResponse(AT_NET_1OF,0);
 }
 
@@ -740,10 +763,12 @@ String SimModem::ftpServer(){
 int SimModem::ftpStatus(){
   Serial.println(readResponse(AT_FTP_SRV_QRY,100));
   Serial.println(readResponse(AT_FTP_UN_QRY,100));
+  Serial.println(readResponse(AT_FTP_PW_QRY,100));
   Serial.println(readResponse(AT_FTP_GET_QNM,100));
   Serial.println(readResponse(AT_FTP_GET_QPT,100));
   Serial.println(readResponse(AT_FTP_PUT_QNM,100));
   Serial.println(readResponse(AT_FTP_PUT_QPT,100));
+  Serial.println(readResponse(AT_FTP_PUT_QOP,100));  
   Serial.println(readResponse(AT_FTP_PUT_QOP,100));
   return 0;
 }
