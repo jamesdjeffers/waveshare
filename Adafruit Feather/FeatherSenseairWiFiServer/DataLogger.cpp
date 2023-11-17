@@ -56,6 +56,15 @@ int DataLogger::fileDump(int option){
   else if (option == FILE_TYPE_LOG){
     temp = logName;
   }
+  else if (option == FILE_TYPE_CRT) {
+    temp = CRT_FILE_NAME;
+  }
+  else if (option == FILE_TYPE_PEM) {
+    temp = PEM_FILE_NAME;
+  }
+  else if (option == FILE_TYPE_KEY) {
+    temp = KEY_FILE_NAME;
+  }
   File dataFile = SD.open(temp);
 
   // if the file is available, write to it:
@@ -296,6 +305,8 @@ void DataLogger::logNewName(){
 
 /*
  * opens one of the file objects associated with current data stream
+ * 
+ * Input Option (type definitions)
  */
 File DataLogger::fileOpen(int option){
   // open the file. note that only one file can be open at a time,
@@ -309,6 +320,15 @@ File DataLogger::fileOpen(int option){
     }
     else if (option == FILE_TYPE_STATUS) {
       return SD.open(fileName);
+    }
+    else if (option == FILE_TYPE_CRT) {
+      return SD.open(CRT_FILE_NAME);
+    }
+    else if (option == FILE_TYPE_PEM) {
+      return SD.open(PEM_FILE_NAME);
+    }
+    else if (option == FILE_TYPE_KEY) {
+      return SD.open(KEY_FILE_NAME);
     }
     else{
       return SD.open(fileName);

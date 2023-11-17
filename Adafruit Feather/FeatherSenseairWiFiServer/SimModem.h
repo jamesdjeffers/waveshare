@@ -22,7 +22,19 @@
 
 #define modemRX                   21
 #define modemTX                   20
-#define modemBaud                 9600
+
+#define BOARD                     0                   // Version 0 = Waveshare, Version 1 = And-Global
+
+#if BOARD == 0
+  #define MODEM_PWR_ON              HIGH
+  #define MODEM_PWR_OFF             LOW
+  #define modemBaud                 9600              // Version 1 and 2 are different
+#elif BOARD == 1
+  #define MODEM_PWR_ON              LOW
+  #define MODEM_PWR_OFF             HIGH
+  #define modemBaud                 115200
+#endif
+
 #define modemTimeout              200
 #define MODEM_TIMER_POWER_PULSE   2000              // Datasheet Ton mintues = 1.2S
 #define MODEM_TIMER_POWER_ON      15000
@@ -35,6 +47,8 @@
 #define MODEM_STATUS_ERROR        1
 
 #define MODEM_CMD_DELAY           10
+
+
 
 #define MODEM_BUFFER 1360
 
@@ -123,8 +137,23 @@
 #define AT_MQT_PUB  "AT+SMPUB=\"information\",5,1,1"
 #define AT_MQT_UNS  "AT+SMUNSUB=\"information\""
 #define AT_MQT_DIS  "AT+SMDISC"
-#define AT_MQT_STA  "AT+SMSTATE"
+#define AT_MQT_STA  "AT+SMSTATE?"
 #define AT_MQT_CFG  "AT+SMCONF?"
+
+#define AT_SSL_VER  "AT+CSSLCFG=\"sslversion\",1,3"
+#define AT_SSL_CIP  "AT+CSSLCFG=\"ciphersuite\",1,0,\"0xc02f\""
+#define AT_SSL_SNI  "AT+CSSLCFG=\"sni\",1,b97b659315cf4f0cafd48b90e3421aa6.s2.eu.hivemq.cloud"
+#define AT_SSL_CTX  "AT+CSSLCFG=\"ctxindex\",1"
+
+#define AT_SSL_CV1  "AT+CSSLCFG=\"convert\",1,\"myclient.crt\",\"myclient.key\""
+#define AT_SSL_CV2  "AT+CSSLCFG=\"convert\",2,\"ca.crt\""
+
+#define AT_SSL_FL1  "AT+CFSWFILE=3,\"ca.crt\",0,1939,5000"
+#define AT_SSL_FL2  "AT+CFSWFILE=3,\"myclient.crt\",0,899,5000"
+#define AT_SSL_FL3  "AT+CFSWFILE=3,\"myclient.key\",0,887,5000"
+
+#define AT_CFS_INI  "AT+CFSINIT"
+#define AT_CFS_TRM  "AT+CFSTERM"
 
 #include "secrets.h"
 #include <Arduino.h>        // required before wiring_private.h
@@ -154,6 +183,8 @@ public:
   int startFTP();                   // Data server initialization
   int checkFTP();                   // Determines if there is an active FTP server connection
   int startMQTT();                  // Data server initialization
+  int startCFS();                   // File system initialization
+  int stopCFS();                    // File system close
   
   // Parses the entire strings received from modem
   String readResponse(String command, int waitTime);
@@ -201,9 +232,19 @@ public:
 
   int mqttStatus();
   int mqttConnect();
+  int mqttDisconnect();
   int mqttPub();
   int mqttSub();
   int mqttUnsub();
+
+  int sslFileDownload(File dataFile, int option);
+  int sslFileRead(int option);
+  int sslConvert(int option);
+
+  int sslCipher();
+  int sslCtindex();
+  int sslSni();
+  int sslVersion();
 
   String RFOn();
   String RFOff();

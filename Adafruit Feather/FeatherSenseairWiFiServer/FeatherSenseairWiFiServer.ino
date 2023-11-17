@@ -34,7 +34,7 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#define SW_VER_NUM          "Firmware v0.9.2"
+#define SW_VER_NUM          "Firmware v0.9.3"
 #include "secrets.h"
 
 #include "SystemControl.h"
@@ -120,9 +120,10 @@ void setup() {
 
   /* Device 1: SD card 1111111111111111111111111111111111111111111111111111111111*/
   if (statusSD == DEVICE_ENABLED){
+    Serial.print("SD Card ");
     statusSD = logger.init();
     if (!statusSD){
-      Serial.println("SD Card Initialized");
+      Serial.println("Initialized");
       logger.fileRemove(1);
       logger.logNewName();
       logger.fileAddCSV("**********************************************",2);
@@ -133,17 +134,20 @@ void setup() {
         writeStatus();
       }
     }
-    Serial.println("SD Card failed");
+    Serial.println("Failed");
   }
   
   /* Device 2: Modem 2222222222222222222222222222222222222222222222222222222222222*/
   if (statusModem == DEVICE_ENABLED){
+    Serial.print("Initializing Modem");
     statusModem = modem.init();
     if (statusModem){
       logger.fileAddCSV("Modem not present",FILE_TYPE_LOG);
+      Serial.println("Modem nor present");
     }
     else{
       logger.fileAddCSV((modem.readClock(0)+": modem initialized"),FILE_TYPE_LOG);
+      Serial.println("Modem initialized");
     }
   }
 
@@ -272,11 +276,25 @@ void loop() {
     else if (serialCommand == "filename"){
       Serial.println(logger.fileNameString());                 // Data file
     }
-    else if (serialCommand == "f"){
-      logger.fileDump(0);                 // Data file
+    else if (serialCommand == "file data"){
+      Serial.println("Data File: ");
+      logger.fileDump(FILE_TYPE_DATA);                 // Data file
     }
-    else if (serialCommand == "F"){
-      logger.fileDump(2);                 // Log file
+    else if (serialCommand == "file log"){
+      Serial.println("Log File: ");
+      logger.fileDump(FILE_TYPE_LOG);                 // Log file
+    }
+    else if (serialCommand == "file cert"){
+      Serial.println("Certificate File: ");
+      logger.fileDump(FILE_TYPE_CRT);                 // Log file
+    }
+    else if (serialCommand == "file pem"){
+      Serial.println("PEM File: ");
+      logger.fileDump(FILE_TYPE_PEM);                 // Log file
+    }
+    else if (serialCommand == "file key"){
+      Serial.println("PEM File: ");
+      logger.fileDump(FILE_TYPE_KEY);                 // Log file
     }
     else if (serialCommand == "r"){
       logger.fileRemove(1);
@@ -334,7 +352,7 @@ void loop() {
     
     else if (serialCommand == "init"){
       Serial.print("Simcom 7070G Reset ");
-      Serial.println(modem.init());
+      statusModem = modem.init();
     }
     
     else if (serialCommand == "power"){
@@ -367,6 +385,14 @@ void loop() {
       Serial.print("Simcom 7070G Enabled = ");
       Serial.println(modem.RFOn());
     }
+    else if (serialCommand == "cfs init"){
+      Serial.print("Simcom 7070G File System = ");
+      Serial.println(modem.startCFS());
+    }
+    else if (serialCommand == "cfs term"){
+      Serial.print("Simcom 7070G File System Closed = ");
+      Serial.println(modem.stopCFS());
+    }
     else if (serialCommand == "exit"){
       Serial.print("Simcom 7070G Device Exit ");
       logger.fileRemoveAll();
@@ -382,6 +408,33 @@ void loop() {
       Serial.println("Simcom 7070G Network Activated = ");
       Serial.println(modem.enableIP());
     }
+    else if (serialCommand == "ssl pem w"){
+      Serial.println("Simcom 7070G Network SSL PEM = ");
+      File tempFile = logger.fileOpen(FILE_TYPE_PEM);
+      modem.sslFileDownload(tempFile,0);
+      tempFile.close();
+    }
+    else if (serialCommand == "ssl crt w"){
+      Serial.println("Simcom 7070G Network SSL CRT = ");
+      File tempFile = logger.fileOpen(FILE_TYPE_CRT);
+      modem.sslFileDownload(tempFile,0);
+      tempFile.close();
+    }
+    else if (serialCommand == "ssl key w"){
+      Serial.println("Simcom 7070G Network SSL key = ");
+      File tempFile = logger.fileOpen(FILE_TYPE_KEY);
+      modem.sslFileDownload(tempFile,0);
+      tempFile.close();
+    }
+    else if (serialCommand == "ssl convert1"){
+      Serial.println("Simcom 7070G Network SSL PEM file = ");
+      Serial.println(modem.sslConvert(0));
+    }
+    else if (serialCommand == "ssl convert2"){
+      Serial.println("Simcom 7070G Network SSL PEM file = ");
+      Serial.println(modem.sslConvert(0));
+    }
+    
     //********************************************************************************
     // FTP Commands
     else if (serialCommand == "ftp start"){
@@ -454,6 +507,14 @@ void loop() {
       Serial.print("Simcom 7070G MQTT Connect = ");
       modem.mqttConnect();
     }
+    else if (serialCommand == "mqtt disconnect"){
+      Serial.print("Simcom 7070G MQTT Disonnect = ");
+      modem.mqttDisconnect();
+    }
+    else if (serialCommand == "mqtt pub"){
+      Serial.print("Simcom 7070G MQTT Publish = ");
+      modem.mqttPub();
+    }
 
     //*********************************************************************************
     // GPS Commands
@@ -501,10 +562,10 @@ void loop() {
     if (statusGPS == DEVICE_ENABLED){
       dataString += "," + gpsSerial.readResponse();
     }
-    if (logModemTime){
+    if (statusModem == DEVICE_ENABLED && logModemTime){
       dataString += "," + modem.readClock(0);
     }
-    if (logModemPower){
+    if (statusModem == DEVICE_ENABLED && logModemPower){
       dataString += "," + modem.readSignal().substring(0,9);
     }
   

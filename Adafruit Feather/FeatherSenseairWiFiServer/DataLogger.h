@@ -34,10 +34,17 @@
 #define LOG_FILE_NAME     "L"
 #define DATA_FILE_NAME    "D"
 
+#define CRT_FILE_NAME    "client.crt"
+#define PEM_FILE_NAME    "CA.pem"
+#define KEY_FILE_NAME    "client.key"
+
 #define FILE_TYPE_DATA      0
 #define FILE_TYPE_BACKUP    1
 #define FILE_TYPE_LOG       2
 #define FILE_TYPE_STATUS    3
+#define FILE_TYPE_CRT       4
+#define FILE_TYPE_PEM       5
+#define FILE_TYPE_KEY       6
 
 #include <SPI.h>
 #include <SD.h>

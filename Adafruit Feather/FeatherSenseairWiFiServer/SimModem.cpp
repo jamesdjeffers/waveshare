@@ -48,10 +48,8 @@ int SimModem::init()
   pinPeripheral(modemRX, PIO_SERCOM); //Assign RX function to pin 11
   pinPeripheral(modemTX, PIO_SERCOM); //Assign TX function to pin 10
   pinMode(MODEM_POWER,OUTPUT);
-  digitalWrite(MODEM_POWER,LOW);
   delay(1000);
-
-  Serial.println("init");
+  powerOn();
   
   // Enable the modem (do not cycle the power if not needed)
   if (!startSession()){
@@ -186,18 +184,20 @@ String SimModem::readBurst(String command, int waitTime, String back){
 
 void SimModem:: powerToggle(){
   int pulses = 1;
+  Serial.println("Nope");
   String responseString = readResponse(ATE_OFF,0);
-  if (responseString.length() > 0) pulses = 2;          // Device is on and communicating, turn off then on
+  Serial.println("Nope");
+  if (responseString.length() > 0) pulses = 2;      // Device is on and communicating, turn off then on
 
   for (int i=0; i<pulses; i++){
-    digitalWrite(MODEM_POWER, LOW);     // Value should be low already    
-    digitalWrite(MODEM_POWER, HIGH);    // Start of "ON" pulse
-    delay(1500);                        // Datasheet Ton mintues = 1.2S
-    digitalWrite(MODEM_POWER, LOW);     // Return output state to low
+    digitalWrite(MODEM_POWER, MODEM_PWR_OFF);       // Value should be low already    
+    digitalWrite(MODEM_POWER, MODEM_PWR_ON);        // Start of "ON" pulse
+    delay(1500);                                    // Datasheet Ton mintues = 1.2S
+    digitalWrite(MODEM_POWER, MODEM_PWR_OFF);       // Return output state to low
     delay(1500);
   }
 
-  while (responseString.indexOf("NORMAL") >= 0 | responseString.indexOf("OK") != 0){
+  while (responseString.indexOf("NORMAL") >= 0 | responseString.indexOf("ATE") >= 0){
     responseString = readResponse(ATE_OFF,0);
   }
 }
@@ -375,7 +375,17 @@ int SimModem::startMQTT(){
  * Return NEMA string
  */
 int SimModem::mqttConnect(){
-  Serial.println(readResponse(AT_MQT_CON,1000));
+  Serial.println(readWaitResponse(AT_MQT_CON,1000,"OK"));
+  return 0;
+}
+
+/*
+ * Read GPS string
+ * No formatting
+ * Return NEMA string
+ */
+int SimModem::mqttDisconnect(){
+  Serial.println(readWaitResponse(AT_MQT_DIS,1000,"OK"));
   return 0;
 }
 
@@ -386,6 +396,7 @@ int SimModem::mqttConnect(){
  */
 int SimModem::mqttStatus(){
   Serial.println(readResponse(AT_MQT_CFG,1000));
+  Serial.println(readResponse(AT_MQT_STA,1000));
   return 0;
 }
 
@@ -415,7 +426,7 @@ String SimModem::readIMEI(){
  * Date format is YY/MM/DD
  */
 String SimModem::readClock(int format){
-  if (checkStatus() >= 0){
+  if (status == MODEM_STATUS_ON){
     String dateTimeResponse = readWaitResponse(AT_TIME,100,"CCLK:");
   
     int startIndex = dateTimeResponse.indexOf("\"");
@@ -787,7 +798,7 @@ String SimModem::ftpFile(){
  * 
  */
 int SimModem::mqttSub(){
-  readResponse(AT_MQT_SUB,0);
+  Serial.println(readWaitResponse(AT_MQT_SUB,1000,"OK"));
   return 0;
 }
 
@@ -796,7 +807,10 @@ int SimModem::mqttSub(){
  * 
  */
 int SimModem::mqttPub(){
+  //char temp[5] = '12345';
+  char temp = 'a';
   readResponse(AT_MQT_PUB,0);
+  SimModemSerial.print(temp);
   return 0;
 }
 
@@ -824,7 +838,7 @@ int SimModem::checkStatus(){
 
   // Determine if the device is ON or OFF
   if (status == MODEM_STATUS_UNKNOWN || status == MODEM_STATUS_OFF){
-
+    Serial.println("Checking status");
     responseString = readResponse(ATE_OFF,0);   // Send basic query, wait for response
     if (responseString == ""){
       status = MODEM_STATUS_OFF;
@@ -869,4 +883,70 @@ int SimModem::checkFTP(){
   else {
     return (int)status;
   }
+}
+
+/*
+ * SSL Functions
+ */
+int SimModem::sslFileDownload(File dataFile, int option){
+  if (option == 0){
+    Serial.println(readResponse(AT_SSL_FL1,0));
+  }
+  else if (option == 1){
+    Serial.println(readResponse(AT_SSL_FL2,0));
+  }
+  else if (option == 2){
+    Serial.println(readResponse(AT_SSL_FL3,0));
+  }
+  for (int j = 0; j < dataFile.size(); j++){
+    char temp = dataFile.read();
+    SimModemSerial.print(temp);
+  }
+  return 0;
+}
+
+int SimModem::sslConvert(int option){
+  if (option == 0){
+    Serial.println(readResponse(AT_SSL_CV1,0));
+  }
+  else if (option == 1){
+    Serial.println(readResponse(AT_SSL_CV2,0));
+  }
+  else if (option == 2){
+    Serial.println(readResponse(AT_SSL_CV1,0));
+  }
+  return 0;
+}
+
+int SimModem::sslCipher(){
+  Serial.println(readResponse(AT_SSL_CIP,0));
+  return 0;
+}
+
+int SimModem::sslSni(){
+  Serial.println(readResponse(AT_SSL_SNI,0));
+  return 0;
+}
+
+int SimModem::sslCtindex(){
+  Serial.println(readResponse(AT_SSL_CTX,0));
+  return 0;
+}
+
+int SimModem::sslVersion(){
+  Serial.println(readResponse(AT_SSL_VER,0));
+  return 0;
+}
+
+/*
+ * CFS Functions
+ */
+int SimModem::startCFS(){
+  Serial.println(readResponse(AT_CFS_INI,0));
+  return 0;
+}
+
+int SimModem::stopCFS(){
+  Serial.println(readResponse(AT_CFS_TRM,0));
+  return 0;
 }
