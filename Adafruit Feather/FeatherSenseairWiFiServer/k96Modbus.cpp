@@ -96,7 +96,7 @@ long k96Modbus::readResponseLong(){
   }
   else{
     status = -1;
-    return -1;
+    return -4;
   }
   
 }
@@ -222,6 +222,8 @@ String k96Modbus::readByteString(int byteAddress){
 int k96Modbus::getDeviceID(){
   if (!writeCommand(5)){                    // Command 5 for reading 4 bytes
     deviceID = readResponseLong();      // Sets status variable if read = success
+    Serial.println("IDID");
+    Serial.println(deviceID);
   } 
   return status;
 }

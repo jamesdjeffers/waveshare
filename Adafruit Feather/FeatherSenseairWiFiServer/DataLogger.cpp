@@ -34,7 +34,10 @@ int DataLogger::init(){
     root.close();
   }
   else{
-    status = -1;
+    // Virtual files for log and data
+    backupData = "";
+    backupLog = "";
+    status = 1;
   }
   return status;
 }
@@ -46,39 +49,53 @@ int DataLogger::init(){
 int DataLogger::fileDump(int option){
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
-  String temp;
-  if (option == FILE_TYPE_DATA){
-    temp = fileName;
-  }
-  else if (option == FILE_TYPE_BACKUP){
-    temp = TEMP_DATA;
-  }
-  else if (option == FILE_TYPE_LOG){
-    temp = logName;
-  }
-  else if (option == FILE_TYPE_CRT) {
-    temp = CRT_FILE_NAME;
-  }
-  else if (option == FILE_TYPE_PEM) {
-    temp = PEM_FILE_NAME;
-  }
-  else if (option == FILE_TYPE_KEY) {
-    temp = KEY_FILE_NAME;
-  }
-  File dataFile = SD.open(temp);
-
-  // if the file is available, write to it:
-  if (dataFile) {
-    while (dataFile.available()) {
-      Serial.write(dataFile.read());
+  if (!status){
+    String temp;
+    if (option == FILE_TYPE_DATA){
+      temp = fileName;
     }
-    dataFile.close();
-    return 0;
+    else if (option == FILE_TYPE_BACKUP){
+      temp = TEMP_DATA;
+    }
+    else if (option == FILE_TYPE_LOG){
+      temp = logName;
+    }
+    else if (option == FILE_TYPE_CRT) {
+      temp = CRT_FILE_NAME;
+    }
+    else if (option == FILE_TYPE_PEM) {
+      temp = PEM_FILE_NAME;
+    }
+    else if (option == FILE_TYPE_KEY) {
+      temp = KEY_FILE_NAME;
+    }
+    File dataFile = SD.open(temp);
+  
+    // if the file is available, write to it:
+    if (dataFile) {
+      while (dataFile.available()) {
+        Serial.write(dataFile.read());
+      }
+      dataFile.close();
+      return 0;
+    }
   }
+  
   // if the file isn't open, pop up an error:
   else {
+    switch (option){
+      case FILE_TYPE_DATA:
+        Serial.print(backupData);
+        break;
+      case FILE_TYPE_LOG:
+        Serial.print(backupLog);
+        break;
+      default:
+        Serial.print(backupData);
+    }
     return 1;
   }
+  return -1;
 }
 
 /*
@@ -188,6 +205,23 @@ int DataLogger::fileAddCSV(String csvString, int option){
       }
     }
   }
+  else if (status == 1){
+     if (option <= FILE_TYPE_DATA){
+      backupData.concat(csvString);
+      backupData.concat("\n");
+      if (backupData.length() > 1000){
+        backupData = backupData.substring(csvString.length(),backupData.length());
+      }
+     }
+     else if (option == FILE_TYPE_LOG){
+      backupLog.concat(csvString);
+      backupLog.concat("\n");
+      if (backupLog.length() > 1000){
+        backupLog = backupLog.substring(csvString.length(),backupLog.length());
+      }
+     }
+     return 1;
+  }
   return -1;    
 }
 
@@ -273,7 +307,12 @@ int DataLogger::fileCount(File dir, String fileName){
 void DataLogger::fileNewName(){
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
-  fileName = DATA_FILE_NAME + String(dataFileCount) + ".csv";
+  if (dataFileCount >= 0){
+    fileName = DATA_FILE_NAME + String(dataFileCount) + ".csv";
+  }
+  else {
+    fileName = String(DATA_FILE_NAME) + "x.csv";
+  }
 
   while (SD.exists(fileName)){
     dataFileCount++;
@@ -336,7 +375,42 @@ File DataLogger::fileOpen(int option){
   }
   else {
     File temp;
+    temp.write("test");
     return temp;
   }
+    
+}
+
+/*
+ * opens one of the file objects associated with current data stream
+ * 
+ * Input Option (type definitions)
+ */
+String DataLogger::fileRead(int option){
+  // open the file. note that only one file can be open at a time,
+  // so you have to close this one before opening another.
+  
+    if (option == FILE_TYPE_BACKUP){
+      return backupData;
+    }
+    else if (option == FILE_TYPE_LOG) {
+      return backupLog;
+    }
+    else if (option == FILE_TYPE_STATUS) {
+      return backupData;
+    }
+    else if (option == FILE_TYPE_CRT) {
+      return backupData;
+    }
+    else if (option == FILE_TYPE_PEM) {
+      return backupData;
+    }
+    else if (option == FILE_TYPE_KEY) {
+      return backupData;
+    }
+    else{
+      return backupData;
+    }
+  
     
 }

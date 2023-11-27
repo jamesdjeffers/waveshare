@@ -58,6 +58,9 @@ class DataLogger
     int logFileCount = -1;
     int dataFileCount = -1;
 
+    String backupData = "";
+    String backupLog = "";
+
   public:
     DataLogger();
     int init();
@@ -77,6 +80,8 @@ class DataLogger
     String fileNameString();
     void logNewName();
     File fileOpen(int option);
+
+    String fileRead(int option);
   
 };
 

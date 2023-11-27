@@ -34,7 +34,7 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#define SW_VER_NUM          "Firmware v0.9.3"
+#define SW_VER_NUM          "Firmware v0.9.4"
 #include "secrets.h"
 
 #include "SystemControl.h"
@@ -116,13 +116,14 @@ char serialBuffer[SERIAL_BUFFER] = "";
 void setup() {
   
   Serial.begin(115200);                   // Initialize serial port for USB connections
+  delay(1000);
   Serial.println("OU Nananophotonics Lab: Project AIMNet");
 
   /* Device 1: SD card 1111111111111111111111111111111111111111111111111111111111*/
   if (statusSD == DEVICE_ENABLED){
     Serial.print("SD Card ");
     statusSD = logger.init();
-    if (!statusSD){
+    if (statusSD == 0){
       Serial.println("Initialized");
       logger.fileRemove(1);
       logger.logNewName();
@@ -134,7 +135,16 @@ void setup() {
         writeStatus();
       }
     }
-    Serial.println("Failed");
+    else if (statusSD > 0){
+      Serial.println("Not Present, Virtual Device Enabled");
+      logger.fileAddCSV("**********************************************",2);
+      logger.fileAddCSV(SW_VER_NUM,FILE_TYPE_LOG);
+      logger.fileAddCSV(("Settings: " + settingsString()),FILE_TYPE_LOG);
+      logger.fileAddCSV(("Memory: Virtual SD card"),FILE_TYPE_LOG);
+    }
+    else{
+      Serial.println("Failed");
+    }
   }
   
   /* Device 2: Modem 2222222222222222222222222222222222222222222222222222222222222*/
@@ -146,7 +156,7 @@ void setup() {
       Serial.println("Modem nor present");
     }
     else{
-      logger.fileAddCSV((modem.readClock(0)+": modem initialized"),FILE_TYPE_LOG);
+      logger.fileAddCSV((modem.readClock(0)+": Modem IMEI " + modem.readIMEI()),FILE_TYPE_LOG);
       Serial.println("Modem initialized");
     }
   }
@@ -158,12 +168,12 @@ void setup() {
     logger.fileAddCSV((modem.readClock(0)+": K96 Sensor = " + k96.readSensorID()+" Firmware = " + k96.readSensorFW()),FILE_TYPE_LOG);
   }
   else {
-    logger.fileAddCSV("Sensor Failed",FILE_TYPE_LOG);
+    logger.fileAddCSV((modem.readClock(0) + ": K96 Sensor Failed"),FILE_TYPE_LOG);
     Serial.println("Sensor failed");
   }
 
   // Create a data acquisition file based on the date
-  if (!statusSD){
+  if (statusSD >= 0){
     logger.fileNewName();
     logger.fileAddCSV((modem.readClock(0)+": Data acquisition file = " + logger.fileNameString()),FILE_TYPE_LOG);
   }
@@ -171,13 +181,22 @@ void setup() {
   // Completed startup, with internet connection store system log with FTP
   if (!statusModem){
     Serial.println("Log File Upload Started");
-    File tempFile = logger.fileOpen(FILE_TYPE_LOG);
-    int currentFTP = modem.ftpPut(tempFile,FILE_TYPE_LOG);
-    logger.fileAddCSV((modem.readClock(0)+": Log File Upload: " + String(currentFTP)),FILE_TYPE_LOG);
-    if (!currentFTP){
-      lastFTPByteLog = tempFile.size();
+    if (statusSD == 0){
+      File tempFile = logger.fileOpen(FILE_TYPE_LOG);
+      int currentFTP = modem.ftpPut(tempFile,FILE_TYPE_LOG);
+      logger.fileAddCSV((modem.readClock(0)+": Log File Upload: " + String(currentFTP)),FILE_TYPE_LOG);
+      if (!currentFTP){
+        lastFTPByteLog = tempFile.size();
+      }
+      tempFile.close();
     }
-    tempFile.close();
+    else if (statusSD == 1){
+      int currentFTP = modem.ftpPut(logger.fileRead(FILE_TYPE_LOG),FILE_TYPE_LOG);
+      logger.fileAddCSV((modem.readClock(0)+": Log File Upload: " + String(currentFTP)),FILE_TYPE_LOG);
+      if (!currentFTP){
+        lastFTPByteLog = 0;
+      }
+    }
   }
 
   /* Device 4: GPS sensor   */
@@ -360,28 +379,28 @@ void loop() {
       modem.powerToggle();
     }
     
-    else if (serialCommand == "i"){
+    else if (serialCommand == "ip"){
       Serial.print("Simcom 7070G IP Address = ");
       Serial.println(modem.readIP());
     }
-    else if (serialCommand == "p"){
+    else if (serialCommand == "ping"){
       Serial.print("Simcom 7070G IP Ping = ");
       Serial.println(modem.readIPPing());
     }
     
-    else if (serialCommand == "1"){
-      Serial.print("Simcom 7070G Disabled = ");
+    else if (serialCommand == "modem gps off"){
+      Serial.print("Simcom 7070G GPS Disabled = ");
       Serial.println(modem.GPSOff());
     }
-    else if (serialCommand == "2"){
-      Serial.print("Simcom 7070G Enabled = ");
+    else if (serialCommand == "modem gps on"){
+      Serial.print("Simcom 7070G GPS Enabled = ");
       Serial.println(modem.GPSOn());
     }
-    else if (serialCommand == "3"){
+    else if (serialCommand == "modem RF off"){
       Serial.print("Simcom 7070G Disabled = ");
       Serial.println(modem.RFOff());
     }
-    else if (serialCommand == "4"){
+    else if (serialCommand == "modem RF on"){
       Serial.print("Simcom 7070G Enabled = ");
       Serial.println(modem.RFOn());
     }
@@ -426,13 +445,32 @@ void loop() {
       modem.sslFileDownload(tempFile,0);
       tempFile.close();
     }
+    else if (serialCommand == "ssl version"){
+      Serial.println("Simcom 7070G Network SSL Type = ");
+      modem.sslVersion();
+    }
     else if (serialCommand == "ssl convert1"){
-      Serial.println("Simcom 7070G Network SSL PEM file = ");
+      Serial.println("Simcom 7070G Network SSL Key file = ");
       Serial.println(modem.sslConvert(0));
     }
     else if (serialCommand == "ssl convert2"){
       Serial.println("Simcom 7070G Network SSL PEM file = ");
-      Serial.println(modem.sslConvert(0));
+      Serial.println(modem.sslConvert(1));
+    }
+    else if (serialCommand == "ssl convert3"){
+      Serial.println("Simcom 7070G Network SSL CRT file = ");
+      Serial.println(modem.sslConvert(2));
+    }
+
+    //********************************************************************************
+    // HTTP Commands
+    else if (serialCommand == "http read"){
+      Serial.println("Simcom 7070G HTTP Read ");
+      Serial.println(modem.httpRead());
+    }
+    else if (serialCommand == "http ssl"){
+      Serial.println("Simcom 7070G HTTP Read ");
+      Serial.println(modem.httpSSL());
     }
     
     //********************************************************************************
@@ -566,7 +604,7 @@ void loop() {
       dataString += "," + modem.readClock(0);
     }
     if (statusModem == DEVICE_ENABLED && logModemPower){
-      dataString += "," + modem.readSignal().substring(0,9);
+      dataString += "," + modem.readSignal();
     }
   
 //SDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSD

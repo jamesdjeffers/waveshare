@@ -62,12 +62,12 @@ private:
     //                    last two bytes are "Modbus" crc codes
     // CRC Code Generator: https://www.lammertbies.nl/comm/info/crc-calculation
 
-    char command[63] = {0x68,0x44,0x00,0x00,0x14,0x51,0x36,   // Read twenty (20) bytes of data
+    char command[63] = {0x68,0x44,0x00,0x00,0x14,0x51,0x36,   // Read twenty (20) bytes of data, from memory location 0
                         0x68,0x44,0x00,0x1C,0x02,0xD8,0x38,   // Read two (2) bytes
                         0x68,0x44,0x03,0xA4,0x02,0x5A,0x38,   // Read two (2) bytes
                         0x68,0x44,0x04,0x24,0x02,0x8A,0x39,   // Read two (2) bytes
                         0x68,0x44,0x04,0xA4,0x02,0xEB,0xF9,   // Read two (2) bytes
-                        0x68,0x44,0x00,0x28,0x04,0x4E,0xFA,   // Read four (4) bytes
+                        0x68,0x44,0x00,0x28,0x04,0x4E,0xFA,   // Read four (4) bytes, memory location x28 = 40
                         0x68,0x44,0x00,0x62,0x04,0x79,0x9A};  // Read four (4) bytes
       
     String labels[12] = {"<br>CH4: ","<br>CO2: ","<br>H2O: ","<br>Pressure: ","<br>T0: ",
@@ -99,8 +99,8 @@ public:
     int readCSVString(String &resultString);
       
     String readByteString(int byteAddress);
-    String readSensorID();
-    String readSensorFW();
+    String readSensorID();                        // DOESN"T WORK TRYING TO READ RAM
+    String readSensorFW();                        // 
 };
 
 #endif

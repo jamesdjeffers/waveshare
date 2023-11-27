@@ -184,9 +184,7 @@ String SimModem::readBurst(String command, int waitTime, String back){
 
 void SimModem:: powerToggle(){
   int pulses = 1;
-  Serial.println("Nope");
   String responseString = readResponse(ATE_OFF,0);
-  Serial.println("Nope");
   if (responseString.length() > 0) pulses = 2;      // Device is on and communicating, turn off then on
 
   for (int i=0; i<pulses; i++){
@@ -320,19 +318,14 @@ int SimModem::startFTP(){
   Serial.println("FTP Session Configuration");
 
   responseString = readResponse(AT_FTP_CID,100);      // Set the internet connection ID (determined by typedef)
-  Serial.println(responseString);
   delay(MODEM_CMD_DELAY);
   responseString = readResponse(AT_FTP_SRV,100);      // Choose the FTP server (name or IP address)
-  Serial.println(responseString);
   delay(MODEM_CMD_DELAY);
   responseString = readResponse(AT_FTP_MOD,100);      // Choose the FTP connection mode (active vs. passive)
-  Serial.println(responseString);
   delay(MODEM_CMD_DELAY);
-   responseString = readResponse(AT_FTP_TYP,100);      // Choose the FTP data type (ASCII vs. binary)
-  Serial.println(responseString);
+  responseString = readResponse(AT_FTP_TYP,100);      // Choose the FTP data type (ASCII vs. binary)
   delay(MODEM_CMD_DELAY);
   responseString = readResponse(AT_FTP_UN,100);       // Set the username (do not leave blank, can be "anonymous")
-  Serial.println(responseString);
   delay(MODEM_CMD_DELAY);
   //responseString = readResponse(AT_FTP_PWD,100);
   //Serial.println(responseString);
@@ -409,9 +402,13 @@ String SimModem::readGPS(){
   String gpsResponse = readResponse(AT_GPS_RD,0);
   return gpsResponse.substring(gpsResponse.indexOf(':',1)+1,gpsResponse.indexOf("\n"));
 }
-
+/********************************************************************************************
+* Read RF Signal Quality
+* Reply is of form CSQ: XX,YY where XX is 99 without a signal
+*/
 String SimModem::readSignal(){
-  return readResponse(AT_CSQ,0);
+   String signalResponse = readWaitResponse(AT_CSQ,100,"CSQ: ");
+   return signalResponse.substring(0,signalResponse.indexOf(","));
 }
 String SimModem::readVerify(){
   return readResponse(ATI,0);
@@ -606,9 +603,6 @@ int SimModem::ftpPut(File dataFile, int option){
   int lastPutSize = dataSize % 1360;
   String lastPutString = AT_FTP_PWR + String(lastPutSize);
 
-  Serial.print("FTP PUT Numbers: ");
-  Serial.print(numPuts);
-  Serial.println(lastPutSize);
   String putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + readClock(2) + "_" + dataFile.name() + String("\"");
   Serial.println(readWaitResponse(putFileName,3000,"OK"));
   Serial.println(readResponse(AT_FTP_PUT_QNM,100));
@@ -656,6 +650,67 @@ int SimModem::ftpPut(File dataFile, int option){
   return -1;
 }
 
+int SimModem::ftpPut(String virtualFile, int option){
+  
+  // Check that modem is present, powered on, connected to network
+  int modem = startSession();
+  if(modem < 0){
+    return -62;
+  }
+  
+  String responseString;
+  char temp;
+  int dataSize = virtualFile.length();
+  int numPuts = dataSize / 1360;
+  int lastPutSize = dataSize % 1360;
+  String lastPutString = AT_FTP_PWR + String(lastPutSize);
+
+  String putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + readClock(2) + "_xx.txt" + String("\"");
+  Serial.println(readWaitResponse(putFileName,3000,"OK"));
+  Serial.println(readResponse(AT_FTP_PUT_QNM,100));
+
+  responseString = readWaitResponse(AT_FTP_PUT,3000,"FTPPUT:");         // Start FTP session
+  Serial.println(responseString);
+
+  while (responseString.indexOf("1,0") >= 0){                           // Wait for +FTPPUT: 1,1,xxxx (default xxxx = 1360)
+    responseString = readWaitResponse(AT_FTP_PUT,3000,"FTPPUT:");
+  }
+
+  if (responseString.indexOf("1,1") >= 0){                              // Device ready for data
+    for (int i = 0; i < numPuts; i++){                                  // Iterate over 1360 byte chunks
+      Serial.println("Data Upload");
+      responseString = readWaitResponse(AT_FTP_PWX,3000,"FTPPUT:");     // Wait for data ready acknowledgement
+      if (responseString.indexOf("2,") < 0){                      // If transmission failed break loop
+        Serial.println(responseString);
+        Serial.println("Error");
+        break;
+      }
+      for (int j = 0; j < 1360; j++){
+        temp = virtualFile[j];
+        SimModemSerial.print(temp);
+      }
+      delay(10);
+      SimModemSerial.readBytesUntil(':',buffer, MODEM_BUFFER);
+      SimModemSerial.flush();
+    }
+    if (lastPutSize){                                                 // Last cycle to write data less than maximum number of bytes
+      Serial.println(lastPutString);
+      readWaitResponse(lastPutString,3000,"FTPPUT:");                 // 
+      for (int j = 0; j < lastPutSize; j++){
+          temp = virtualFile[j];
+          SimModemSerial.print(temp);
+        }
+        SimModemSerial.readBytesUntil(':',buffer, MODEM_BUFFER);
+        SimModemSerial.flush();
+    }
+    responseString = readWaitResponse(AT_FTP_PDN,0,"OK");
+    //readResponse(AT_FTP_EXT,0);                                   // Disabled manual disconnect (MIGHT USE AGAIN)
+    if (responseString){
+      return 0;
+    }   
+  }  
+  return -1;
+}
 /*
  *  Attach a string to an existing file
  */
@@ -913,7 +968,7 @@ int SimModem::sslConvert(int option){
     Serial.println(readResponse(AT_SSL_CV2,0));
   }
   else if (option == 2){
-    Serial.println(readResponse(AT_SSL_CV1,0));
+    Serial.println(readResponse(AT_SSL_CV3,0));
   }
   return 0;
 }
@@ -938,6 +993,29 @@ int SimModem::sslVersion(){
   return 0;
 }
 
+/*
+ * HTTP Functions
+ */
+int SimModem::httpRead(){
+  Serial.println(readResponse(AT_WWW_URL,0));
+  Serial.println(readResponse(AT_WWW_BDY,0));
+  Serial.println(readResponse(AT_WWW_HDR,0));
+  Serial.println(readResponse(AT_WWW_CON,0));
+  Serial.println(readResponse(AT_WWW_STA,0));
+  Serial.println(readResponse(AT_WWW_HED_CLR,0));
+  Serial.println(readResponse(AT_WWW_HED_AGT,0));
+  Serial.println(readResponse(AT_WWW_HED_CAC,0));
+  Serial.println(readResponse(AT_WWW_HED_CON,0));
+  Serial.println(readResponse(AT_WWW_HED_ACC,0));
+  Serial.println(readWaitResponse(AT_WWW_GET,3000,"+SHREQ:"));
+  Serial.println(readBurst(AT_WWW_RD,1000,"url"));
+  return 0;
+}
+
+int SimModem::httpSSL(){
+  Serial.println(readResponse(AT_WWW_SSL,0));
+  return 0;
+}
 /*
  * CFS Functions
  */

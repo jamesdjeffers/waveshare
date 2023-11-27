@@ -86,6 +86,20 @@
 #define AT_SNPDPID "AT_SNPDPID=1"
 #define AT_IP_PING IP_PING
 
+#define AT_WWW_URL      "AT+SHCONF=\"URL\",\"https://www.ou.edu/aimnet\""
+#define AT_WWW_BDY      "AT+SHCONF=\"BODYLEN\",1024"
+#define AT_WWW_HDR      "AT+SHCONF=\"HEADERLEN\",350"
+#define AT_WWW_CON      "AT+SHCONN"
+#define AT_WWW_STA      "AT+SHSTATE?"
+#define AT_WWW_HED_CLR  "AT+SHCHEAD"
+#define AT_WWW_HED_AGT  "AT+SHAHEAD=\"User-Agent\",\"curl/7.47.0\""
+#define AT_WWW_HED_CAC  "AT+SHAHEAD=\"Cache-control\",\"no-cache\""
+#define AT_WWW_HED_CON  "AT+SHAHEAD=\"Connection\",\"keep-alive\""
+#define AT_WWW_HED_ACC  "AT+SHAHEAD=\"Accept\",\"*/*\""
+#define AT_WWW_GET      "AT+SHREQ=\"/get\",1"
+#define AT_WWW_RD       "AT+SHREAD=0,1565"
+#define AT_WWW_SSL      "AT+SHSSL=1,\"\""
+
 #define AT_FTP_EXT      "AT+FTPQUIT"
 #define AT_FTP_CID      "AT+FTPCID=0"
 #define AT_FTP_STA      "AT+FTPSTATE"
@@ -147,8 +161,11 @@
 
 #define AT_SSL_CV1  "AT+CSSLCFG=\"convert\",1,\"myclient.crt\",\"myclient.key\""
 #define AT_SSL_CV2  "AT+CSSLCFG=\"convert\",2,\"ca.crt\""
+#define AT_SSL_CV3  "AT+CSSLCFG=\"convert\",1,\"ca.crt\""
 
-#define AT_SSL_FL1  "AT+CFSWFILE=3,\"ca.crt\",0,1939,5000"
+//#define AT_SSL_FL1  "AT+CFSWFILE=3,\"ca.crt\",0,1939,5000"
+//#define AT_SSL_FL1  "AT+CFSWFILE=3,\"ca.crt\",0,5072,5000"
+#define AT_SSL_FL1  "AT+CFSWFILE=3,\"ca.crt\",0,2388,5000"
 #define AT_SSL_FL2  "AT+CFSWFILE=3,\"myclient.crt\",0,899,5000"
 #define AT_SSL_FL3  "AT+CFSWFILE=3,\"myclient.key\",0,887,5000"
 
@@ -219,6 +236,7 @@ public:
   String ftpFile();
   
   int ftpPut(String dataString);
+  int ftpPut(String virtualFile, int option);
   int ftpPut(File dataFile, int option);
 
   int ftpStatus();
@@ -245,6 +263,9 @@ public:
   int sslCtindex();
   int sslSni();
   int sslVersion();
+
+  int httpRead();
+  int httpSSL();
 
   String RFOn();
   String RFOff();
