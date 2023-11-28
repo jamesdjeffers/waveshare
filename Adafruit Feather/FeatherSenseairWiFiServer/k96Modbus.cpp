@@ -47,8 +47,13 @@ int k96Modbus::init(){
   }
   pinMode(K96_POWER,OUTPUT);
   digitalWrite(K96_POWER,HIGH);
+  delay(1000);                               // Wait for serial port to enable
   
-  getDeviceID();                             // Read serial number, sets status
+  // getDeviceID();                          // ERROR ACCESSING RAM
+  writeCommand(0);                           // Check communication port
+  int readStatus = readResponse(14);
+  if (readStatus > 14) status = 0;
+  else status = -1;
   return status;
   
 }
@@ -96,7 +101,7 @@ long k96Modbus::readResponseLong(){
   }
   else{
     status = -1;
-    return -4;
+    return status;
   }
   
 }
@@ -216,14 +221,13 @@ String k96Modbus::readByteString(int byteAddress){
 
 /****************************************************************
  * Read the serial number of K96 sensor
- * 
- * Returns: status
- */
+ * ERROR: CAN'T READ MEMORY, NOT A MODBUS REGISTER = NOT ALLOWED
+ *
+ * Return: status
+ ****************************************************************/
 int k96Modbus::getDeviceID(){
   if (!writeCommand(5)){                    // Command 5 for reading 4 bytes
-    deviceID = readResponseLong();      // Sets status variable if read = success
-    Serial.println("IDID");
-    Serial.println(deviceID);
+    deviceID = readResponseLong();          // Sets status variable if read = success
   } 
   return status;
 }

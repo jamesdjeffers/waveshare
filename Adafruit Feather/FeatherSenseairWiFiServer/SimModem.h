@@ -255,6 +255,7 @@ public:
   int mqttSub();
   int mqttUnsub();
 
+  int sslFileDownload(int option);
   int sslFileDownload(File dataFile, int option);
   int sslFileRead(int option);
   int sslConvert(int option);

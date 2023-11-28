@@ -61,12 +61,12 @@
 
 String dataString = "";
 
-int intervalData = 1000;                 // Read data from sensor and GPS every 30 seconds
-int timerLastRead = 0;                         // Millisecond timer value for last data read
+int intervalData = 1000;                  // Read data from sensor and GPS every 30 seconds
+int timerLastRead = 0;                        // Millisecond timer value for last data read
 
 int intervalFile = DEVICE_ENABLED;        // Status variable to enable/disable code options
 
-int intervalUpdate = 0;                   // Write most recent data to FTP server every 3 minutes
+int intervalUpdate = 180000;                   // Write most recent data to FTP server every 3 minutes
 int timerLastDataFile = 0;                // Millisecond timer value for last data upload
 int countLastDataFile = 0;
 
@@ -77,12 +77,14 @@ int intervalBackup = 0;                   // Backup the data file every 15 minut
 int LastFileUpload = 0;
 int lastFTPByteBackup = 0;
 
-int intervalLog = 0;                // Update the system event log every 60 minutes
+int intervalLog = 120000;                // Update the system event log every 60 minutes
 int timerLastLog = 0;                     // Timer value in milliseconds for last log FTP
 int lastFTPByteLog = 0;                   // Number of bytes current log succussful FTP
 
-SystemControl control;
-int powerSave = 0;                        // Track the ability to turn off the modem bewteen uploads
+SystemControl control;                    // Enables external DC power supplies for fan, pump, etc.
+int powerSave = DEVICE_ENABLED;           // Track the ability to turn off the modem bewteen uploads
+bool powerFan = true;                     // Enable signal for hardware buck converter
+bool powerPump = true;                    // Enable signal for hardware buck converter
 
 SimModem modem;
 int statusModem = DEVICE_ENABLED;         // Tracks current state of modem (0 = OK)
@@ -90,11 +92,11 @@ int statusFTP = -1;                       // Tracks the number of consectutive F
 bool logModemTime = true;
 bool logModemPower = true;
 
-k96Modbus k96;
-int statusSensor = -1;
+k96Modbus k96;                            // Serial port device using Modbus protocol
+int statusSensor = DEVICE_ENABLED;        // System will always try to communicate with a sensor
 
-DataLogger logger;
-int statusSD = DEVICE_ENABLED;
+DataLogger logger;                        // Physical or virtual (saves data in RAM without card)
+int statusSD = DEVICE_ENABLED;            // Maximum 1024 files, filename length =< 8
 bool fileSizeLimit = false;               // Number of bytes before a new file is created
 bool dataSizeLimit = false;               // Number of bytes stored locally before modem is activated
 
@@ -104,19 +106,21 @@ int statusClock = 0;
 
 // Serial port parser
 char serialBuffer[SERIAL_BUFFER] = "";
+
 /*********************************************************************************************
  *  Setup and Initializtion
  *  
- *  Serial port for debug
- *  SD card (can store text before/after other devices) 
- *  Modem for real-time data transfer
+ *  a. Serial port for debug
+ *  1. SD card (can store text before/after other devices) 
+ *  2. Modem for real-time data transfer
+ *  3. SenseAir K96 Sensor (serial port with Modbus)
  *  
- */
+ ********************************************************************************************/
 
 void setup() {
   
   Serial.begin(115200);                   // Initialize serial port for USB connections
-  delay(1000);
+  delay(3000);
   Serial.println("OU Nananophotonics Lab: Project AIMNet");
 
   /* Device 1: SD card 1111111111111111111111111111111111111111111111111111111111*/
@@ -149,19 +153,19 @@ void setup() {
   
   /* Device 2: Modem 2222222222222222222222222222222222222222222222222222222222222*/
   if (statusModem == DEVICE_ENABLED){
-    Serial.print("Initializing Modem");
+    Serial.print("Modem ");
     statusModem = modem.init();
     if (statusModem){
       logger.fileAddCSV("Modem not present",FILE_TYPE_LOG);
-      Serial.println("Modem nor present");
+      Serial.println(" not present");
     }
     else{
       logger.fileAddCSV((modem.readClock(0)+": Modem IMEI " + modem.readIMEI()),FILE_TYPE_LOG);
-      Serial.println("Modem initialized");
+      Serial.println(" initialized");
     }
   }
 
-  /* Device 3: Chemical sensor 11111111111111111111111111111111111111111111111111111111111111*/
+  /* Device 3: Chemical sensor 333333333333333333333333333333333333333333333333333*/
   statusSensor = k96.init();
   if (!statusSensor){
     Serial.println("Sensor initialized");
@@ -178,10 +182,10 @@ void setup() {
     logger.fileAddCSV((modem.readClock(0)+": Data acquisition file = " + logger.fileNameString()),FILE_TYPE_LOG);
   }
   
-  // Completed startup, with internet connection store system log with FTP
+  // Completed startup, if internet connection available store system log
   if (!statusModem){
     Serial.println("Log File Upload Started");
-    if (statusSD == 0){
+    if (statusSD == FILE_REAL){
       File tempFile = logger.fileOpen(FILE_TYPE_LOG);
       int currentFTP = modem.ftpPut(tempFile,FILE_TYPE_LOG);
       logger.fileAddCSV((modem.readClock(0)+": Log File Upload: " + String(currentFTP)),FILE_TYPE_LOG);
@@ -190,7 +194,7 @@ void setup() {
       }
       tempFile.close();
     }
-    else if (statusSD == 1){
+    else if (statusSD == FILE_VIRTUAL){
       int currentFTP = modem.ftpPut(logger.fileRead(FILE_TYPE_LOG),FILE_TYPE_LOG);
       logger.fileAddCSV((modem.readClock(0)+": Log File Upload: " + String(currentFTP)),FILE_TYPE_LOG);
       if (!currentFTP){
@@ -201,6 +205,7 @@ void setup() {
 
   /* Device 4: GPS sensor   */
   if (statusGPS == DEVICE_ENABLED){
+    control.enablePower(POWER_GPS);                     // Added for board 3 support
     statusGPS = gpsSerial.init();
     if (!statusGPS){
       Serial.println("GPS Module initialized");
@@ -208,6 +213,14 @@ void setup() {
     else{
       Serial.println("GPS Module failed");
     }
+  }
+
+  /* Device 5 and 6: System pump and system fan */
+  if (powerFan){
+    control.enablePower(POWER_FAN);
+  }
+  if (powerPump){
+    control.enablePower(POWER_PUMP);
   }
 
 }
@@ -598,7 +611,7 @@ void loop() {
     dataString = ',' + String(millis()/1000) + ',';
     int test = k96.readCSVString(dataString);                              // Sensor data
     if (statusGPS == DEVICE_ENABLED){
-      dataString += "," + gpsSerial.readResponse();
+      dataString += gpsSerial.readResponse();
     }
     if (statusModem == DEVICE_ENABLED && logModemTime){
       dataString += "," + modem.readClock(0);
@@ -612,7 +625,7 @@ void loop() {
 // Check file size for disk management, change filename if necessary
 // Display external error message using opCode
     if(intervalFile == DEVICE_ENABLED){
-      statusSD = logger.fileAddCSV(dataString, option);
+      statusSD = logger.fileAddCSV(dataString, 0);
       fileSizeLimit = (logger.fileCheckSize() > FILE_MAX_SIZE);
       dataSizeLimit = ((logger.fileCheckSize() - lastFTPByteBackup) > DATA_MAX_SIZE) || fileSizeLimit;
       if (statusSD > 0){
@@ -637,11 +650,19 @@ void loop() {
     //FTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTP
     // Update the data file on the FTP server
     if (intervalUpdate && (millis()-timerLastDataFile) > intervalUpdate){
-      File tempFile = logger.fileOpen(1);
-      int currentFTP = modem.ftpPut(tempFile,1);
-      tempFile.close();
+      int currentFTP = 0;                           // Status variable for current operation
+      if (statusSD == 0){
+        File tempFile = logger.fileOpen(1);
+        currentFTP = modem.ftpPut(tempFile,1);
+        tempFile.close();
+      }
+      else {
+        Serial.println("jim");
+        Serial.println(logger.fileRead(FILE_TYPE_BACKUP));
+        currentFTP = modem.ftpPut(logger.fileRead(FILE_TYPE_BACKUP),FILE_TYPE_DATA);
+      }
       if (!currentFTP){
-        logger.fileAddCSV((modem.readClock(0)+": File append, recent data"),2);
+        logger.fileAddCSV((modem.readClock(0)+": File append, recent data"),FILE_TYPE_LOG);
         logger.fileRemove(1);         
         timerLastDataFile = millis();
         statusFTP = 0;
@@ -657,21 +678,30 @@ void loop() {
       // LOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOG
       // Update the system log, append only the bytes since the last successful FTP transfer
       else if (intervalLog && (millis()-timerLastLog) > intervalLog){
-        File tempFile = logger.fileOpen(2);
-        tempFile.seek(lastFTPByteLog);
-        int currentFTP = modem.ftpPut(tempFile,2);
+        int currentFTP; int fileSize = 0;
+        if (statusSD == 0){
+          File tempFile = logger.fileOpen(2);
+          tempFile.seek(lastFTPByteLog);
+          currentFTP = modem.ftpPut(tempFile,2);
+          fileSize = tempFile.size();
+          tempFile.close();
+        }
+        else{
+          modem.ftpPut(logger.fileRead(FILE_TYPE_LOG),FILE_TYPE_LOG);
+          logger.fileAddCSV((modem.readClock(0)+": Log File Upload: " + String(currentFTP)),FILE_TYPE_LOG);
+        }
         // Successful FTP, record in log, set number bytes, reset timer 
         if (!currentFTP){
           logger.fileAddCSV((modem.readClock(0)+": Log file updated"),2);
           timerLastLog = millis();
           statusFTP = 0;
-          lastFTPByteLog = tempFile.size();
+          lastFTPByteLog = fileSize;
         }
         else{
           logger.fileAddCSV((modem.readClock(0)+": Log file upload failed"),2);
           statusFTP += 1;
         }
-        tempFile.close();
+        
       }
       //CONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIG
       // Not updating the data file

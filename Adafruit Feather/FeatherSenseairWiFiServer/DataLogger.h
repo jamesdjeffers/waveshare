@@ -46,6 +46,9 @@
 #define FILE_TYPE_PEM       5
 #define FILE_TYPE_KEY       6
 
+#define FILE_REAL           0
+#define FILE_VIRTUAL        1
+
 #include <SPI.h>
 #include <SD.h>
     

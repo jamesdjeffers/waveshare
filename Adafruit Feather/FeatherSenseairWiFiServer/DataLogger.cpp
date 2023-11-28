@@ -208,16 +208,16 @@ int DataLogger::fileAddCSV(String csvString, int option){
   else if (status == 1){
      if (option <= FILE_TYPE_DATA){
       backupData.concat(csvString);
-      backupData.concat("\n");
-      if (backupData.length() > 1000){
-        backupData = backupData.substring(csvString.length(),backupData.length());
+      backupData.concat('\n');
+      if (backupData.length() > 3000){
+        backupData = backupData.substring(backupData.indexOf('\n')+1,backupData.length());
       }
      }
      else if (option == FILE_TYPE_LOG){
       backupLog.concat(csvString);
-      backupLog.concat("\n");
+      backupLog.concat('\n');
       if (backupLog.length() > 1000){
-        backupLog = backupLog.substring(csvString.length(),backupLog.length());
+        backupLog = backupLog.substring(backupLog.indexOf('\n')+1,backupLog.length());
       }
      }
      return 1;
@@ -389,28 +389,28 @@ File DataLogger::fileOpen(int option){
 String DataLogger::fileRead(int option){
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
-  
-    if (option == FILE_TYPE_BACKUP){
-      return backupData;
-    }
-    else if (option == FILE_TYPE_LOG) {
-      return backupLog;
-    }
-    else if (option == FILE_TYPE_STATUS) {
-      return backupData;
-    }
-    else if (option == FILE_TYPE_CRT) {
-      return backupData;
-    }
-    else if (option == FILE_TYPE_PEM) {
-      return backupData;
-    }
-    else if (option == FILE_TYPE_KEY) {
-      return backupData;
-    }
-    else{
-      return backupData;
-    }
-  
+  String temp;
+  if (option == FILE_TYPE_BACKUP){
+    temp = backupData;
+  }
+  else if (option == FILE_TYPE_LOG) {
+    temp = backupLog;
+  }
+  else if (option == FILE_TYPE_STATUS) {
+    temp = backupData;
+  }
+  else if (option == FILE_TYPE_CRT) {
+    temp = backupData;
+  }
+  else if (option == FILE_TYPE_PEM) {
+    temp = backupData;
+  }
+  else if (option == FILE_TYPE_KEY) {
+    temp = backupData;
+  }
+  else{
+    temp = backupData;
+  }
+  return temp;
     
 }

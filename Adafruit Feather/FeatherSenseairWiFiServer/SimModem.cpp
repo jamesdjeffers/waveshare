@@ -43,13 +43,13 @@ SimModem::SimModem()
 int SimModem::init()
 {
   
-  SimModemSerial.begin(modemBaud);
-  SimModemSerial.setTimeout(modemTimeout);
-  pinPeripheral(modemRX, PIO_SERCOM); //Assign RX function to pin 11
-  pinPeripheral(modemTX, PIO_SERCOM); //Assign TX function to pin 10
-  pinMode(MODEM_POWER,OUTPUT);
-  delay(1000);
-  powerOn();
+  SimModemSerial.begin(modemBaud);            // Modems have different UART speeds
+  SimModemSerial.setTimeout(modemTimeout);    // Timeout should be minimum
+  pinPeripheral(modemRX, PIO_SERCOM);         // Assign RX function
+  pinPeripheral(modemTX, PIO_SERCOM);         // Assign TX function
+  pinMode(MODEM_POWER,OUTPUT);                // Control pin for power on, off, and reset
+    
+  powerOn();                                  // Need to check for device on, off, not present
   
   // Enable the modem (do not cycle the power if not needed)
   if (!startSession()){
@@ -206,11 +206,11 @@ void SimModem:: powerToggle(){
  *  Use the ATE_OFF string to enforce interface conditions
  */
 int SimModem::powerOn(){
-  
+  String responseString;
   if (status >= -1){
     // Check if device is on by disabling echo mode
     SimModemSerial.flush();
-    String responseString = readResponse(ATE_OFF,0);
+    responseString = readResponse(ATE_OFF,0);
     if(responseString != ""){
       return 0;
     }
@@ -218,7 +218,10 @@ int SimModem::powerOn(){
   
   // Device is not in reset, toggle IO pin and start timer
   else{
-    status = -2;
+    responseString = readResponse(ATE_OFF,0);
+    if(responseString != ""){
+      return 0;
+    }
     powerToggle();
   }
   return 0;   // Operation occured normally
@@ -605,7 +608,6 @@ int SimModem::ftpPut(File dataFile, int option){
 
   String putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + readClock(2) + "_" + dataFile.name() + String("\"");
   Serial.println(readWaitResponse(putFileName,3000,"OK"));
-  Serial.println(readResponse(AT_FTP_PUT_QNM,100));
 
   responseString = readWaitResponse(AT_FTP_PUT,3000,"FTPPUT:");         // Start FTP session
   Serial.println(responseString);
@@ -632,7 +634,7 @@ int SimModem::ftpPut(File dataFile, int option){
       SimModemSerial.flush();
     }
     if (lastPutSize){                                                 // Last cycle to write data less than maximum number of bytes
-      Serial.println(lastPutString);
+      Serial.println("test");
       readWaitResponse(lastPutString,3000,"FTPPUT:");                 // 
       for (int j = 0; j < lastPutSize; j++){
           temp = dataFile.read();
@@ -665,7 +667,13 @@ int SimModem::ftpPut(String virtualFile, int option){
   int lastPutSize = dataSize % 1360;
   String lastPutString = AT_FTP_PWR + String(lastPutSize);
 
-  String putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + readClock(2) + "_xx.txt" + String("\"");
+  String putFileName;
+  if (option == 2){
+    putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + readClock(2) + ".txt" + String("\"");
+  }
+  else{
+    putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + readClock(2) + ".csv" + String("\"");
+  }
   Serial.println(readWaitResponse(putFileName,3000,"OK"));
   Serial.println(readResponse(AT_FTP_PUT_QNM,100));
 
@@ -686,7 +694,7 @@ int SimModem::ftpPut(String virtualFile, int option){
         break;
       }
       for (int j = 0; j < 1360; j++){
-        temp = virtualFile[j];
+        temp = virtualFile[j+i*1360];
         SimModemSerial.print(temp);
       }
       delay(10);
@@ -697,7 +705,7 @@ int SimModem::ftpPut(String virtualFile, int option){
       Serial.println(lastPutString);
       readWaitResponse(lastPutString,3000,"FTPPUT:");                 // 
       for (int j = 0; j < lastPutSize; j++){
-          temp = virtualFile[j];
+          temp = virtualFile[j+numPuts*1360];
           SimModemSerial.print(temp);
         }
         SimModemSerial.readBytesUntil(':',buffer, MODEM_BUFFER);
@@ -955,6 +963,32 @@ int SimModem::sslFileDownload(File dataFile, int option){
   }
   for (int j = 0; j < dataFile.size(); j++){
     char temp = dataFile.read();
+    SimModemSerial.print(temp);
+  }
+  return 0;
+}
+
+/******************************************************************************
+ * SSL File Download from code
+ * Download the selected file from "secrets.h"
+ *****************************************************************************/
+
+int SimModem::sslFileDownload(int option){
+  int fileSize = 0;
+  if (option == 0){
+    Serial.println(readResponse(AT_SSL_FL1,0));
+    fileSize = SSL_ROOT_SIZE;
+  }
+  else if (option == 1){
+    Serial.println(readResponse(AT_SSL_FL2,0));
+    fileSize = SSL_CERT_SIZE;
+  }
+  else if (option == 2){
+    Serial.println(readResponse(AT_SSL_FL3,0));
+    fileSize = SSL_KEY_SIZE;
+  }
+  for (int j = 0; j < fileSize; j++){
+    char temp = SSL_ROOT[j];
     SimModemSerial.print(temp);
   }
   return 0;
