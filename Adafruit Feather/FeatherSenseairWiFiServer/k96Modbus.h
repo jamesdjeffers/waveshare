@@ -77,30 +77,29 @@ private:
     int status = -1;
     String deviceID = "";
     
-    int getDeviceID();
+    int getDeviceID();                                        // ERROR attempting to read RAM
     
-    int k96_memory[K96_DATA_SIZE] = {1,1,1,1,1,1,1,1,1};
+    int k96_memory[K96_DATA_SIZE] = {1,2,3,4,5,6,7,8,9,10,11,12};
     long k96MemoryLong[3] = {1,1,1};
-    int wordS16(byte high, byte low);
-    int wordU16(byte high, byte low);
+    int wordS16(byte high, byte low);                         // Convert Modbus message, signed 16-bit integer
+    int wordU16(byte high, byte low);                         // Convert Modbus message, unsigned 16-bit integer
     long longConvert(byte highest, byte higher, byte lower, byte lowest);
  
 public:
     k96Modbus();
-    
-    
-    int init();
-    int readResponse();
-    long readResponseLong(); 
+        
+    int init();                                   // Create serial port and digital IO
+    int readResponse();                           // Read 16-bit data
+    long readResponseLong();                      // Read 32-bit data
     int readResponse(int numBytes);    
-    int writeCommand(int byteAddress);
+    int writeCommand(int byteAddress);            // Currently seven commands (0-6)
     
-    String readCSVString();
-    int readCSVString(String &resultString);
+    String readCSVString();                       // Legacy data read
+    int readCSVString(String &resultString);      // Faster implementation uses pointer
       
     String readByteString(int byteAddress);
     String readSensorID();                        // DOESN"T WORK TRYING TO READ RAM
-    String readSensorFW();                        // 
+    String readSensorFW();                        // DOESN"T WORK TRYING TO READ RAM
 };
 
 #endif

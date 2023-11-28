@@ -75,6 +75,9 @@ String SimModem::readResponse(String command, int waitTime){
   if (bufferLength){
     String responseString = String(buffer);
     responseString.trim();
+    if (responseString.indexOf("SMSUB") >= 0){
+      Serial.println("MQTT SUB");
+    }
     if (responseString.endsWith("OK")){
       if (bufferLength == 6){
         return "OK";
@@ -101,8 +104,10 @@ String SimModem::readWaitResponse(String command, int waitTime, String back){
   String responseString = "";
   String bytesReady = "";
   
-  SimModemSerial.flush();
-  SimModemSerial.println(command);                                                // Send AT command to modem
+  if (command.length() >0){
+    SimModemSerial.flush();
+    SimModemSerial.println(command);                                                // Send AT command to modem
+  }
 
   if (waitTime){    SimModemSerial.setTimeout(waitTime);  }                       // Choose timeout option
   else {            SimModemSerial.setTimeout(modemTimeout);  }                   // Default timeout option
@@ -117,7 +122,9 @@ String SimModem::readWaitResponse(String command, int waitTime, String back){
 
     responseString = responseString.substring(0,bufferLength);
     int backIndex = responseString.indexOf(back);
-
+    if (responseString.indexOf("SMSUB") >= 0){
+      Serial.println("MQTT SUB");
+    }
     if (backIndex >= 0){
       return responseString.substring(backIndex+back.length(),responseString.indexOf('\n',backIndex));
     }
@@ -263,7 +270,6 @@ int SimModem::startSession(){
   }
 
   // Check for network connection, if connected synchronize time
-  Serial.println("Connecting");
   returnValue = enableIP();
   if (returnValue >= 0){
     returnValue = startNTP();
@@ -318,7 +324,6 @@ int SimModem::startFTP(){
     Serial.println("FTP Session Active, Disabling");
     delay(MODEM_CMD_DELAY);
   }
-  Serial.println("FTP Session Configuration");
 
   responseString = readResponse(AT_FTP_CID,100);      // Set the internet connection ID (determined by typedef)
   delay(MODEM_CMD_DELAY);
@@ -330,14 +335,11 @@ int SimModem::startFTP(){
   delay(MODEM_CMD_DELAY);
   responseString = readResponse(AT_FTP_UN,100);       // Set the username (do not leave blank, can be "anonymous")
   delay(MODEM_CMD_DELAY);
-  //responseString = readResponse(AT_FTP_PWD,100);
-  //Serial.println(responseString);
+  //responseString = readResponse(AT_FTP_PWD,100);      // Password will default to empty string
   //delay(MODEM_CMD_DELAY);
-  responseString = readResponse(AT_FTP_PRT,100);
-  Serial.println(responseString);
+  responseString = readResponse(AT_FTP_PRT,100);      // Choose the FTP port (default = 21)
   delay(MODEM_CMD_DELAY);
-  responseString = readResponse(AT_FTP_PUT_NEW,100);
-  Serial.println(responseString);
+  responseString = readResponse(AT_FTP_PUT_NEW,100);  // Choose the FTP file mode (default = APPEND)
   delay(MODEM_CMD_DELAY);
 
   readResponse(AT_FTP_GET_NAM,0);                     // Set the file name for "read" operations, includes list details
@@ -355,13 +357,26 @@ int SimModem::startFTP(){
  * No formatting
  * Return NEMA string
  */
-int SimModem::startMQTT(){
-  Serial.println(readResponse(MQTT_SERVER,0));
-  Serial.println(readResponse(MQTT_UN,0));
-  Serial.println(readResponse(MQTT_PWD,0));
-  Serial.println(readResponse(MQTT_ID,0));
-  Serial.println(readResponse(AT_MQT_TIM,0));
-  Serial.println(readResponse(AT_MQT_CSS,0));
+int SimModem::startMQTT(int option){
+  if (option ==0){
+    Serial.println(readResponse(MQTT_SERVER,0));
+    Serial.println(readResponse(MQTT_UN,0));
+    Serial.println(readResponse(MQTT_PWD,0));
+    Serial.println(readResponse(MQTT_ID,0));
+    Serial.println(readResponse(AT_MQT_TIM,0));
+    Serial.println(readResponse(AT_MQT_CSS,0));
+  }
+  else if (option == 1){
+    Serial.println(readResponse(MQTT_SERVER_TEST_BASIC,0));
+    Serial.println(readResponse(MQTT_UN,0));
+    Serial.println(readResponse(MQTT_PWD,0));
+    Serial.println(readResponse(MQTT_ID,0));
+    Serial.println(readResponse(AT_SSL_SNI_MOSQ,0));
+    Serial.println(readResponse(AT_MQT_TIM,0));
+    Serial.println(readResponse(AT_MQT_CSS,0));
+    Serial.println(readResponse(AT_MQT_TOP,0));
+  }
+  
   return 0;
 }
 
@@ -602,15 +617,14 @@ int SimModem::ftpPut(File dataFile, int option){
   String responseString;
   char temp;
   int dataSize = dataFile.size() - dataFile.position();
-  int numPuts = dataSize / 1360;
-  int lastPutSize = dataSize % 1360;
+  int numPuts = dataSize / MODEM_BUFFER;
+  int lastPutSize = dataSize % MODEM_BUFFER;
   String lastPutString = AT_FTP_PWR + String(lastPutSize);
 
   String putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + readClock(2) + "_" + dataFile.name() + String("\"");
-  Serial.println(readWaitResponse(putFileName,3000,"OK"));
+  readWaitResponse(putFileName,3000,"OK");
 
   responseString = readWaitResponse(AT_FTP_PUT,3000,"FTPPUT:");         // Start FTP session
-  Serial.println(responseString);
 
   while (responseString.indexOf("1,0") >= 0){                           // Wait for +FTPPUT: 1,1,xxxx (default xxxx = 1360)
     responseString = readWaitResponse(AT_FTP_PUT,3000,"FTPPUT:");
@@ -618,14 +632,14 @@ int SimModem::ftpPut(File dataFile, int option){
 
   if (responseString.indexOf("1,1") >= 0){                              // Device ready for data
     for (int i = 0; i < numPuts; i++){                                  // Iterate over 1360 byte chunks
-      Serial.println("Data Upload");
+      
       responseString = readWaitResponse(AT_FTP_PWX,3000,"FTPPUT:");     // Wait for data ready acknowledgement
-      if (responseString.indexOf("2,") < 0){                      // If transmission failed break loop
+      if (responseString.indexOf("2,") < 0){                            // If transmission failed break loop
         Serial.println(responseString);
         Serial.println("Error");
         break;
       }
-      for (int j = 0; j < 1360; j++){
+      for (int j = 0; j < MODEM_BUFFER; j++){
         temp = dataFile.read();
         SimModemSerial.print(temp);
       }
@@ -663,8 +677,8 @@ int SimModem::ftpPut(String virtualFile, int option){
   String responseString;
   char temp;
   int dataSize = virtualFile.length();
-  int numPuts = dataSize / 1360;
-  int lastPutSize = dataSize % 1360;
+  int numPuts = dataSize / MODEM_BUFFER;
+  int lastPutSize = dataSize % MODEM_BUFFER;
   String lastPutString = AT_FTP_PWR + String(lastPutSize);
 
   String putFileName;
@@ -674,11 +688,10 @@ int SimModem::ftpPut(String virtualFile, int option){
   else{
     putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + readClock(2) + ".csv" + String("\"");
   }
-  Serial.println(readWaitResponse(putFileName,3000,"OK"));
-  Serial.println(readResponse(AT_FTP_PUT_QNM,100));
+  readWaitResponse(putFileName,3000,"OK");
+  readResponse(AT_FTP_PUT_QNM,100);                                     // ERROR: Delay needed? or verifies set name
 
   responseString = readWaitResponse(AT_FTP_PUT,3000,"FTPPUT:");         // Start FTP session
-  Serial.println(responseString);
 
   while (responseString.indexOf("1,0") >= 0){                           // Wait for +FTPPUT: 1,1,xxxx (default xxxx = 1360)
     responseString = readWaitResponse(AT_FTP_PUT,3000,"FTPPUT:");
@@ -686,15 +699,13 @@ int SimModem::ftpPut(String virtualFile, int option){
 
   if (responseString.indexOf("1,1") >= 0){                              // Device ready for data
     for (int i = 0; i < numPuts; i++){                                  // Iterate over 1360 byte chunks
-      Serial.println("Data Upload");
       responseString = readWaitResponse(AT_FTP_PWX,3000,"FTPPUT:");     // Wait for data ready acknowledgement
-      if (responseString.indexOf("2,") < 0){                      // If transmission failed break loop
-        Serial.println(responseString);
+      if (responseString.indexOf("2,") < 0){                            // If transmission failed break loop
         Serial.println("Error");
         break;
       }
-      for (int j = 0; j < 1360; j++){
-        temp = virtualFile[j+i*1360];
+      for (int j = 0; j < MODEM_BUFFER; j++){
+        temp = virtualFile[j+i*MODEM_BUFFER];
         SimModemSerial.print(temp);
       }
       delay(10);
@@ -702,10 +713,9 @@ int SimModem::ftpPut(String virtualFile, int option){
       SimModemSerial.flush();
     }
     if (lastPutSize){                                                 // Last cycle to write data less than maximum number of bytes
-      Serial.println(lastPutString);
       readWaitResponse(lastPutString,3000,"FTPPUT:");                 // 
       for (int j = 0; j < lastPutSize; j++){
-          temp = virtualFile[j+numPuts*1360];
+          temp = virtualFile[j+numPuts*MODEM_BUFFER];
           SimModemSerial.print(temp);
         }
         SimModemSerial.readBytesUntil(':',buffer, MODEM_BUFFER);
@@ -734,9 +744,6 @@ int SimModem::ftpPut(String dataString){
   if(modem < 0){
     return -62;
   }
-
-  Serial.println(readResponse(AT_FTP_PUT_NEW,0));
-  Serial.println(readResponse(AT_FTP_PUT_QNM,0));
 
   Serial.print("FTP Put Request Transmission :");
   Serial.println(readWaitResponse(AT_FTP_PUT,3000,"FTPPUT:"));
@@ -862,6 +869,7 @@ String SimModem::ftpFile(){
  */
 int SimModem::mqttSub(){
   Serial.println(readWaitResponse(AT_MQT_SUB,1000,"OK"));
+  Serial.println(readWaitResponse("",5000,"SMSUB"));
   return 0;
 }
 
@@ -872,8 +880,9 @@ int SimModem::mqttSub(){
 int SimModem::mqttPub(){
   //char temp[5] = '12345';
   char temp = 'a';
-  readResponse(AT_MQT_PUB,0);
+  readResponse(AT_MQT_PUB1,0);
   SimModemSerial.print(temp);
+  readWaitResponse("",5000,"SMSUB");
   return 0;
 }
 
@@ -975,8 +984,9 @@ int SimModem::sslFileDownload(File dataFile, int option){
 
 int SimModem::sslFileDownload(int option){
   int fileSize = 0;
+  String rootFile = SSL_ROOT;
   if (option == 0){
-    Serial.println(readResponse(AT_SSL_FL1,0));
+    Serial.println(readResponse(AT_SSL_CA_MOSQ,0));
     fileSize = SSL_ROOT_SIZE;
   }
   else if (option == 1){
@@ -988,7 +998,7 @@ int SimModem::sslFileDownload(int option){
     fileSize = SSL_KEY_SIZE;
   }
   for (int j = 0; j < fileSize; j++){
-    char temp = SSL_ROOT[j];
+    char temp = rootFile[j];
     SimModemSerial.print(temp);
   }
   return 0;
@@ -1013,7 +1023,7 @@ int SimModem::sslCipher(){
 }
 
 int SimModem::sslSni(){
-  Serial.println(readResponse(AT_SSL_SNI,0));
+  Serial.println(readResponse(AT_SSL_SNI_HIVE,0));
   return 0;
 }
 

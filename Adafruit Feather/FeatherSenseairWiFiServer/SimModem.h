@@ -48,8 +48,6 @@
 
 #define MODEM_CMD_DELAY           10
 
-
-
 #define MODEM_BUFFER 1360
 
 #define MODEM_POWER     6                           // Board Design 0.2 used pin "D5", header, and jumper
@@ -142,32 +140,37 @@
 #define AT_GPS_OFF "AT+CGNSPWR=0"
 #define AT_GPS_RD  "AT+CGNSINF"
 
-#define AT_MQT_URL  "AT+SMCONF=\"URL\",555.555.555.555,6000"
-#define AT_MQT_TIM  "AT+SMCONF=\"KEEPTIME\",60"
-#define AT_MQT_CSS  "AT+SMCONF=\"CLEANSS\",1"
-#define AT_MQT_CLI  "AT+SMCONF=\"CLIENTID\",\"URL\""
-#define AT_MQT_CON  "AT+SMCONN"
-#define AT_MQT_SUB  "AT+SMSUB=\"information\",1"
-#define AT_MQT_PUB  "AT+SMPUB=\"information\",5,1,1"
-#define AT_MQT_UNS  "AT+SMUNSUB=\"information\""
-#define AT_MQT_DIS  "AT+SMDISC"
-#define AT_MQT_STA  "AT+SMSTATE?"
-#define AT_MQT_CFG  "AT+SMCONF?"
+#define AT_MQT_URL        "AT+SMCONF=\"URL\",b97b659315cf4f0cafd48b90e3421aa6.s2.eu.hivemq.cloud,6000"
+#define AT_MQT_URL_MOSQ   "AT+SMCONF=\"URL\",test.mosquitto.org,6000"
+#define AT_MQT_TIM        "AT+SMCONF=\"KEEPTIME\",60"
+#define AT_MQT_CSS        "AT+SMCONF=\"CLEANSS\",1"
+#define AT_MQT_CLI        "AT+SMCONF=\"CLIENTID\",\"dev0\""
+#define AT_MQT_TOP        "AT+SMCONF=\"TOPIC\",aimnet"
+#define AT_MQT_CON        "AT+SMCONN"
+#define AT_MQT_SUB        "AT+SMSUB=\"aimnet\",1"
+#define AT_MQT_PUB5        "AT+SMPUB=\"aimnet\",5,1,1"
+#define AT_MQT_PUB1        "AT+SMPUB=\"aimnet\",1,1,1"
+#define AT_MQT_UNS        "AT+SMUNSUB=\"aimnet\""
+#define AT_MQT_DIS        "AT+SMDISC"
+#define AT_MQT_STA        "AT+SMSTATE?"
+#define AT_MQT_CFG        "AT+SMCONF?"
 
-#define AT_SSL_VER  "AT+CSSLCFG=\"sslversion\",1,3"
-#define AT_SSL_CIP  "AT+CSSLCFG=\"ciphersuite\",1,0,\"0xc02f\""
-#define AT_SSL_SNI  "AT+CSSLCFG=\"sni\",1,b97b659315cf4f0cafd48b90e3421aa6.s2.eu.hivemq.cloud"
-#define AT_SSL_CTX  "AT+CSSLCFG=\"ctxindex\",1"
+#define AT_SSL_VER        "AT+CSSLCFG=\"sslversion\",1,3"
+#define AT_SSL_CIP        "AT+CSSLCFG=\"ciphersuite\",1,0,\"0xc02f\""
+#define AT_SSL_SNI_HIVE   "AT+CSSLCFG=\"sni\",1,b97b659315cf4f0cafd48b90e3421aa6.s2.eu.hivemq.cloud"
+#define AT_SSL_SNI_MOSQ   "AT+CSSLCFG=\"sni\",1,test.mosquitto.org"
+#define AT_SSL_CTX        "AT+CSSLCFG=\"ctxindex\",1"
 
-#define AT_SSL_CV1  "AT+CSSLCFG=\"convert\",1,\"myclient.crt\",\"myclient.key\""
-#define AT_SSL_CV2  "AT+CSSLCFG=\"convert\",2,\"ca.crt\""
-#define AT_SSL_CV3  "AT+CSSLCFG=\"convert\",1,\"ca.crt\""
+#define AT_SSL_CV1        "AT+CSSLCFG=\"convert\",1,\"myclient.crt\",\"myclient.key\""
+#define AT_SSL_CV2        "AT+CSSLCFG=\"convert\",2,\"ca.crt\""
+#define AT_SSL_CV3        "AT+CSSLCFG=\"convert\",1,\"ca.crt\""
 
-//#define AT_SSL_FL1  "AT+CFSWFILE=3,\"ca.crt\",0,1939,5000"
-//#define AT_SSL_FL1  "AT+CFSWFILE=3,\"ca.crt\",0,5072,5000"
-#define AT_SSL_FL1  "AT+CFSWFILE=3,\"ca.crt\",0,2388,5000"
-#define AT_SSL_FL2  "AT+CFSWFILE=3,\"myclient.crt\",0,899,5000"
-#define AT_SSL_FL3  "AT+CFSWFILE=3,\"myclient.key\",0,887,5000"
+#define AT_SSL_FL1          "AT+CFSWFILE=3,\"ca.crt\",0,1939,5000"
+#define AT_SSL_CA_GOOG      "AT+CFSWFILE=3,\"ca.crt\",0,5072,5000"
+#define AT_SSL_CA_HIVE      "AT+CFSWFILE=3,\"ca.crt\",0,2388,5000"
+#define AT_SSL_CA_MOSQ      "AT+CFSWFILE=3,\"ca.crt\",0,1452,5000"
+#define AT_SSL_FL2          "AT+CFSWFILE=3,\"myclient.crt\",0,899,5000"
+#define AT_SSL_FL3          "AT+CFSWFILE=3,\"myclient.key\",0,887,5000"
 
 #define AT_CFS_INI  "AT+CFSINIT"
 #define AT_CFS_TRM  "AT+CFSTERM"
@@ -199,7 +202,7 @@ public:
   int startNTP();                   // Internal time clock server
   int startFTP();                   // Data server initialization
   int checkFTP();                   // Determines if there is an active FTP server connection
-  int startMQTT();                  // Data server initialization
+  int startMQTT(int option);        // Data server initialization
   int startCFS();                   // File system initialization
   int stopCFS();                    // File system close
   

@@ -414,3 +414,37 @@ String DataLogger::fileRead(int option){
   return temp;
     
 }
+
+/*
+ * opens one of the file objects associated with current data stream
+ * 
+ * Input Option (type definitions)
+ */
+int DataLogger::fileSize(int option){
+  // open the file. note that only one file can be open at a time,
+  // so you have to close this one before opening another.
+  int size;
+  if (option == FILE_TYPE_BACKUP){
+    size = backupData.length();
+  }
+  else if (option == FILE_TYPE_LOG) {
+    size = backupLog.length();
+  }
+  else if (option == FILE_TYPE_STATUS) {
+    size = backupData.length();
+  }
+  else if (option == FILE_TYPE_CRT) {
+    size = backupData.length();
+  }
+  else if (option == FILE_TYPE_PEM) {
+    size = backupData.length();
+  }
+  else if (option == FILE_TYPE_KEY) {
+    size = backupData.length();
+  }
+  else{
+    size = backupData.length();
+  }
+  return size;
+    
+}

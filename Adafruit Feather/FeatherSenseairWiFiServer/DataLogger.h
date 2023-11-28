@@ -85,6 +85,7 @@ class DataLogger
     File fileOpen(int option);
 
     String fileRead(int option);
+    int fileSize(int option);
   
 };
 

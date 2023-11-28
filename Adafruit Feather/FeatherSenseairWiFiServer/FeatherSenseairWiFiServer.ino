@@ -169,7 +169,7 @@ void setup() {
   statusSensor = k96.init();
   if (!statusSensor){
     Serial.println("Sensor initialized");
-    logger.fileAddCSV((modem.readClock(0)+": K96 Sensor = " + k96.readSensorID()+" Firmware = " + k96.readSensorFW()),FILE_TYPE_LOG);
+    logger.fileAddCSV((modem.readClock(0)+": K96 Sensor Initialized"),FILE_TYPE_LOG);
   }
   else {
     logger.fileAddCSV((modem.readClock(0) + ": K96 Sensor Failed"),FILE_TYPE_LOG);
@@ -188,17 +188,25 @@ void setup() {
     if (statusSD == FILE_REAL){
       File tempFile = logger.fileOpen(FILE_TYPE_LOG);
       int currentFTP = modem.ftpPut(tempFile,FILE_TYPE_LOG);
-      logger.fileAddCSV((modem.readClock(0)+": Log File Upload: " + String(currentFTP)),FILE_TYPE_LOG);
+      logger.fileAddCSV((modem.readClock(0)+": Log File Uploaded Bytes: " + String(tempFile.size())),FILE_TYPE_LOG);
       if (!currentFTP){
+        logger.fileAddCSV((modem.readClock(0)+": Log File Uploaded Bytes: " + String(tempFile.size())),FILE_TYPE_LOG);
         lastFTPByteLog = tempFile.size();
+      }
+      else{
+        logger.fileAddCSV((modem.readClock(0)+": Log File Upload Failed Code: " + String(currentFTP)),FILE_TYPE_LOG);
       }
       tempFile.close();
     }
     else if (statusSD == FILE_VIRTUAL){
       int currentFTP = modem.ftpPut(logger.fileRead(FILE_TYPE_LOG),FILE_TYPE_LOG);
-      logger.fileAddCSV((modem.readClock(0)+": Log File Upload: " + String(currentFTP)),FILE_TYPE_LOG);
+      
       if (!currentFTP){
-        lastFTPByteLog = 0;
+        logger.fileAddCSV((modem.readClock(0)+": Log File Upload (Bytes) = " + String(logger.fileSize(FILE_TYPE_LOG))),FILE_TYPE_LOG);
+        lastFTPByteLog = logger.fileSize(FILE_TYPE_LOG);
+      }
+      else{
+        logger.fileAddCSV((modem.readClock(0)+": Log File Upload Failed (Code) = " + String(currentFTP)),FILE_TYPE_LOG);
       }
     }
   }
@@ -458,6 +466,10 @@ void loop() {
       modem.sslFileDownload(tempFile,0);
       tempFile.close();
     }
+    else if (serialCommand == "ssl pem test"){
+      Serial.println("Simcom 7070G Network SSL Test file = ");
+      Serial.println(modem.sslFileDownload(2));
+    }
     else if (serialCommand == "ssl version"){
       Serial.println("Simcom 7070G Network SSL Type = ");
       modem.sslVersion();
@@ -546,9 +558,13 @@ void loop() {
 
     //*********************************************************************************
     // MQTT Commands
-    else if (serialCommand == "mqtt start"){
+    else if (serialCommand == "mqtt start 0"){
       Serial.print("Simcom 7070G MQTT Start = ");
-      modem.startMQTT();
+      modem.startMQTT(0);
+    }
+    else if (serialCommand == "mqtt start 1"){
+      Serial.print("Simcom 7070G MQTT Start = ");
+      modem.startMQTT(1);
     }
     else if (serialCommand == "mqtt status"){
       Serial.print("Simcom 7070G MQTT Status = ");
@@ -565,6 +581,14 @@ void loop() {
     else if (serialCommand == "mqtt pub"){
       Serial.print("Simcom 7070G MQTT Publish = ");
       modem.mqttPub();
+    }
+    else if (serialCommand == "mqtt sub"){
+      Serial.print("Simcom 7070G MQTT Subscribe = ");
+      modem.mqttSub();
+    }
+    else if (serialCommand == "mqtt unsub"){
+      Serial.print("Simcom 7070G MQTT Unsubscribe = ");
+      modem.mqttUnsub();
     }
 
     //*********************************************************************************
@@ -657,12 +681,10 @@ void loop() {
         tempFile.close();
       }
       else {
-        Serial.println("jim");
-        Serial.println(logger.fileRead(FILE_TYPE_BACKUP));
         currentFTP = modem.ftpPut(logger.fileRead(FILE_TYPE_BACKUP),FILE_TYPE_DATA);
       }
       if (!currentFTP){
-        logger.fileAddCSV((modem.readClock(0)+": File append, recent data"),FILE_TYPE_LOG);
+        logger.fileAddCSV((modem.readClock(0)+": File upload (bytes) = " + String(logger.fileSize(FILE_TYPE_BACKUP))),FILE_TYPE_LOG);
         logger.fileRemove(1);         
         timerLastDataFile = millis();
         statusFTP = 0;
@@ -670,7 +692,7 @@ void loop() {
       // Failed FTP, increment the consecutive failure counter
       else{
         statusFTP += 1;
-        logger.fileAddCSV((modem.readClock(0)+": FTP ERROR append"),2);
+        logger.fileAddCSV((modem.readClock(0)+": File UPLOAD ERROR data upload"),2);
       }
         
     }
@@ -678,21 +700,23 @@ void loop() {
       // LOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOGLOG
       // Update the system log, append only the bytes since the last successful FTP transfer
       else if (intervalLog && (millis()-timerLastLog) > intervalLog){
-        int currentFTP; int fileSize = 0;
-        if (statusSD == 0){
-          File tempFile = logger.fileOpen(2);
+        Serial.println("Log File Upload Started");
+        int currentFTP = 0;
+        int fileSize = 0;
+        
+        if (statusSD == 0){                           // SD card present, upload file
+          File tempFile = logger.fileOpen(FILE_TYPE_LOG);
           tempFile.seek(lastFTPByteLog);
-          currentFTP = modem.ftpPut(tempFile,2);
+          currentFTP = modem.ftpPut(tempFile,FILE_TYPE_LOG);
           fileSize = tempFile.size();
           tempFile.close();
         }
-        else{
-          modem.ftpPut(logger.fileRead(FILE_TYPE_LOG),FILE_TYPE_LOG);
-          logger.fileAddCSV((modem.readClock(0)+": Log File Upload: " + String(currentFTP)),FILE_TYPE_LOG);
+        else{                                         // SD card virtual, upload string
+          currentFTP = modem.ftpPut(logger.fileRead(FILE_TYPE_LOG),FILE_TYPE_LOG);
         }
         // Successful FTP, record in log, set number bytes, reset timer 
         if (!currentFTP){
-          logger.fileAddCSV((modem.readClock(0)+": Log file updated"),2);
+          logger.fileAddCSV((modem.readClock(0)+": Log upload (bytes) = " + String(logger.fileSize(FILE_TYPE_LOG))),FILE_TYPE_LOG);
           timerLastLog = millis();
           statusFTP = 0;
           lastFTPByteLog = fileSize;
