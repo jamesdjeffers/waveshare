@@ -235,7 +235,7 @@ public:
 
   void   ftpFileName(int type);
   String ftpList();
-  String ftpGet();
+  int ftpGet(String &fileString);
   String ftpFile();
   
   int ftpPut(String dataString);
@@ -255,7 +255,7 @@ public:
   int mqttConnect();
   int mqttDisconnect();
   int mqttPub();
-  int mqttSub();
+  int mqttSub(String &message);
   int mqttUnsub();
 
   int sslFileDownload(int option);

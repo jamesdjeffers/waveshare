@@ -367,14 +367,14 @@ int SimModem::startMQTT(int option){
     Serial.println(readResponse(AT_MQT_CSS,0));
   }
   else if (option == 1){
-    Serial.println(readResponse(MQTT_SERVER_TEST_BASIC,0));
-    Serial.println(readResponse(MQTT_UN,0));
-    Serial.println(readResponse(MQTT_PWD,0));
-    Serial.println(readResponse(MQTT_ID,0));
-    Serial.println(readResponse(AT_SSL_SNI_MOSQ,0));
-    Serial.println(readResponse(AT_MQT_TIM,0));
-    Serial.println(readResponse(AT_MQT_CSS,0));
-    Serial.println(readResponse(AT_MQT_TOP,0));
+    readResponse(MQTT_SERVER_TEST_BASIC,0);
+    readResponse(MQTT_UN,0);
+    readResponse(MQTT_PWD,0);
+    readResponse(MQTT_ID,0);
+    readResponse(AT_SSL_SNI_MOSQ,0);
+    readResponse(AT_MQT_TIM,0);
+    readResponse(AT_MQT_CSS,0);
+    readResponse(AT_MQT_TOP,0);
   }
   
   return 0;
@@ -583,16 +583,16 @@ String SimModem::ftpList(){
 /*
  * File read operation for small files
  */
-String SimModem::ftpGet(){
+int SimModem::ftpGet(String &fileString){
   
   String responseString = readWaitResponse(AT_FTP_GET,5000,"FTPGET:");
 
   if (responseString.indexOf("1,1") >= 0){
-    String file = readBurst(AT_FTP_GRD,5000,"FTPGET:");
+    fileString.concat(readBurst(AT_FTP_GRD,5000,"FTPGET:"));
     readWaitResponse(AT_FTP_EXT,1000,"FTPGET: 1,80");
-    return file;
+    return 0;
   }
-  else return "";
+  else return -1;
 }
 /*********************************************************************
  *  PUT operation for small files
@@ -867,9 +867,9 @@ String SimModem::ftpFile(){
  * MQTT Server Subscribe
  * 
  */
-int SimModem::mqttSub(){
-  Serial.println(readWaitResponse(AT_MQT_SUB,1000,"OK"));
-  Serial.println(readWaitResponse("",5000,"SMSUB"));
+int SimModem::mqttSub(String &message){
+  readWaitResponse(AT_MQT_SUB,1000,"OK");
+  message.concat(readWaitResponse("",5000,"SMSUB:"));
   return 0;
 }
 

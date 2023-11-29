@@ -34,7 +34,7 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#define SW_VER_NUM          "Firmware v0.9.4"
+#define SW_VER_NUM          "Firmware v0.10.1"
 #include "secrets.h"
 
 #include "SystemControl.h"
@@ -59,7 +59,15 @@
 #define DEVICE_ENABLED      0
 #define DEVICE_DISABLED     1
 
+#define MODE_CFG_FTP        0
+#define MODE_CFG_MQTT       1
+
+#define MODE_DATA           MODE_CFG_FTP
+#define MODE_CTRL           MODE_CFG_MQTT
+
 String dataString = "";
+int returnValue = 0;                      // Generic integer for catching return values
+String returnString = "";
 
 int intervalData = 1000;                  // Read data from sensor and GPS every 30 seconds
 int timerLastRead = 0;                        // Millisecond timer value for last data read
@@ -531,7 +539,8 @@ void loop() {
     }
     else if (serialCommand == "ftp update"){
       Serial.print("Simcom 7070G FTP Get = ");
-      if (updateConfig() >= 0){
+      String json;
+      if (updateConfig(json) >= 0){
         Serial.print("File downloaded");
         Serial.println(settingsString());
       }
@@ -561,10 +570,12 @@ void loop() {
     else if (serialCommand == "mqtt start 0"){
       Serial.print("Simcom 7070G MQTT Start = ");
       modem.startMQTT(0);
+      modem.mqttStatus();
     }
     else if (serialCommand == "mqtt start 1"){
       Serial.print("Simcom 7070G MQTT Start = ");
       modem.startMQTT(1);
+      modem.mqttStatus();
     }
     else if (serialCommand == "mqtt status"){
       Serial.print("Simcom 7070G MQTT Status = ");
@@ -573,6 +584,7 @@ void loop() {
     else if (serialCommand == "mqtt connect"){
       Serial.print("Simcom 7070G MQTT Connect = ");
       modem.mqttConnect();
+      modem.mqttStatus();
     }
     else if (serialCommand == "mqtt disconnect"){
       Serial.print("Simcom 7070G MQTT Disonnect = ");
@@ -584,7 +596,9 @@ void loop() {
     }
     else if (serialCommand == "mqtt sub"){
       Serial.print("Simcom 7070G MQTT Subscribe = ");
-      modem.mqttSub();
+      String json;
+      modem.mqttSub(json);
+      Serial.println(json);
     }
     else if (serialCommand == "mqtt unsub"){
       Serial.print("Simcom 7070G MQTT Unsubscribe = ");
@@ -638,7 +652,7 @@ void loop() {
       dataString += gpsSerial.readResponse();
     }
     if (statusModem == DEVICE_ENABLED && logModemTime){
-      dataString += "," + modem.readClock(0);
+      dataString.concat(modem.readClock(0));
     }
     if (statusModem == DEVICE_ENABLED && logModemPower){
       dataString += "," + modem.readSignal();
@@ -674,16 +688,15 @@ void loop() {
     //FTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTP
     // Update the data file on the FTP server
     if (intervalUpdate && (millis()-timerLastDataFile) > intervalUpdate){
-      int currentFTP = 0;                           // Status variable for current operation
       if (statusSD == 0){
         File tempFile = logger.fileOpen(1);
-        currentFTP = modem.ftpPut(tempFile,1);
+        returnValue = modem.ftpPut(tempFile,1);
         tempFile.close();
       }
       else {
-        currentFTP = modem.ftpPut(logger.fileRead(FILE_TYPE_BACKUP),FILE_TYPE_DATA);
+        returnValue = modem.ftpPut(logger.fileRead(FILE_TYPE_BACKUP),FILE_TYPE_DATA);
       }
-      if (!currentFTP){
+      if (!returnValue){
         logger.fileAddCSV((modem.readClock(0)+": File upload (bytes) = " + String(logger.fileSize(FILE_TYPE_BACKUP))),FILE_TYPE_LOG);
         logger.fileRemove(1);         
         timerLastDataFile = millis();
@@ -701,21 +714,20 @@ void loop() {
       // Update the system log, append only the bytes since the last successful FTP transfer
       else if (intervalLog && (millis()-timerLastLog) > intervalLog){
         Serial.println("Log File Upload Started");
-        int currentFTP = 0;
         int fileSize = 0;
         
         if (statusSD == 0){                           // SD card present, upload file
           File tempFile = logger.fileOpen(FILE_TYPE_LOG);
           tempFile.seek(lastFTPByteLog);
-          currentFTP = modem.ftpPut(tempFile,FILE_TYPE_LOG);
+          returnValue = modem.ftpPut(tempFile,FILE_TYPE_LOG);
           fileSize = tempFile.size();
           tempFile.close();
         }
         else{                                         // SD card virtual, upload string
-          currentFTP = modem.ftpPut(logger.fileRead(FILE_TYPE_LOG),FILE_TYPE_LOG);
+          returnValue = modem.ftpPut(logger.fileRead(FILE_TYPE_LOG),FILE_TYPE_LOG);
         }
         // Successful FTP, record in log, set number bytes, reset timer 
-        if (!currentFTP){
+        if (!returnValue){
           logger.fileAddCSV((modem.readClock(0)+": Log upload (bytes) = " + String(logger.fileSize(FILE_TYPE_LOG))),FILE_TYPE_LOG);
           timerLastLog = millis();
           statusFTP = 0;
@@ -730,17 +742,24 @@ void loop() {
       //CONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIG
       // Not updating the data file
       else if (intervalCfg && (millis()-timerLastCfg) > intervalCfg){
-        int currentFTP = updateConfig();
-        if (currentFTP < -1){
+        String json;
+        if (MODE_CTRL == MODE_CFG_FTP){
+          modem.ftpGet(json);
+        }
+        else {
+          modem.mqttSub(json);
+        }
+        returnValue = updateConfig(json);
+        if (returnValue < -1){
           logger.fileAddCSV((modem.readClock(0)+": Invalid settings"),2);
           timerLastCfg = millis();
           statusFTP = 0;
         }
-        else if (currentFTP == -1){
+        else if (returnValue == -1){
           logger.fileAddCSV((modem.readClock(0)+": Config Download: Invalid file"),2);
           statusFTP += 1;
         }
-        else if (currentFTP >0){
+        else if (returnValue >0){
           logger.fileAddCSV((modem.readClock(0)+": Settings Updated = " + settingsString()),2);
           timerLastCfg = millis();
           statusFTP = 0;
@@ -756,10 +775,10 @@ void loop() {
         
         File tempFile = logger.fileOpen(0);
         tempFile.seek(lastFTPByteBackup);
-        int currentFTP = modem.ftpPut(tempFile,0);
+        returnValue = modem.ftpPut(tempFile,0);
 
         // Check if file was uploaded correctly
-        if (!currentFTP){
+        if (!returnValue){
           logger.fileAddCSV((modem.readClock(0)+": Backup file updated"),2);
           LastFileUpload = millis();
           statusFTP = 0;
@@ -813,15 +832,12 @@ void loop() {
  *  -2 : file found, incorrect format
  ***********************************************************************************************/
 
-int updateConfig(){
+int updateConfig(String json){
 
-  String json;
   String result;
   int found;
   int num;
   int change = 0;
-  
-  json = modem.ftpGet();
   
   // Empty string indicates file not opened
   if (json.length() < 20){
