@@ -280,6 +280,10 @@ int SimModem::startSession(){
     if (returnValue > 0){
       return 1;
     }
+    returnValue = startMQTT(1);
+    if (returnValue > 0){
+      return 1;
+    }
     imei = readResponse(AT_GSN,0);
     imei = imei.substring(0,15) + "_";
     return 0;
@@ -321,7 +325,6 @@ int SimModem::startFTP(){
   // Previous operations may have left an active FTP server connection
   if (responseString.indexOf("1") >= 0){
     responseString = readResponse(AT_FTP_EXT,100);
-    Serial.println("FTP Session Active, Disabling");
     delay(MODEM_CMD_DELAY);
   }
 
@@ -353,18 +356,18 @@ int SimModem::startFTP(){
 }
 
 /*
- * Read GPS string
+ * Set the MQTT configuration
  * No formatting
  * Return NEMA string
  */
 int SimModem::startMQTT(int option){
   if (option ==0){
-    Serial.println(readResponse(MQTT_SERVER,0));
-    Serial.println(readResponse(MQTT_UN,0));
-    Serial.println(readResponse(MQTT_PWD,0));
-    Serial.println(readResponse(MQTT_ID,0));
-    Serial.println(readResponse(AT_MQT_TIM,0));
-    Serial.println(readResponse(AT_MQT_CSS,0));
+    readResponse(MQTT_SERVER,0);
+    readResponse(MQTT_UN,0);
+    readResponse(MQTT_PWD,0);
+    readResponse(MQTT_ID,0);
+    readResponse(AT_MQT_TIM,0);
+    readResponse(AT_MQT_CSS,0);
   }
   else if (option == 1){
     readResponse(MQTT_SERVER_TEST_BASIC,0);
@@ -376,35 +379,60 @@ int SimModem::startMQTT(int option){
     readResponse(AT_MQT_CSS,0);
     readResponse(AT_MQT_TOP,0);
   }
+  statusMQTT = MODEM_STATUS_MQTT_CFG;
+  return 0;
+}
+
+/******************************************************************************
+ * MQTT Connect to Server
+ * 
+ * Attempts to connect without checking status
+ * On error checks for reason (active connection is considered success)
+ * Sets status variable if connection active
+ *
+ * Return:   0 - Connection started or active
+ *          -1 - failed
+ *****************************************************************************/
+int SimModem::mqttConnect(){
+  String response = readResponse(AT_MQT_CON,1000);
+  if (response.indexOf("OK") >= 0){
+    statusMQTT = MODEM_STATUS_MQTT_CON;
+    return 0;
+  }
+  else if (response.indexOf("ERROR") >= 0){
+    return 0;
+  }
   
   return 0;
 }
 
-/*
- * Read GPS string
- * No formatting
- * Return NEMA string
- */
-int SimModem::mqttConnect(){
-  Serial.println(readWaitResponse(AT_MQT_CON,1000,"OK"));
-  return 0;
-}
-
-/*
- * Read GPS string
- * No formatting
- * Return NEMA string
- */
+/******************************************************************************
+ * MQTT Disconnect from Server
+ * 
+ * Attempts to disconnect without checking status
+ * On error checks for reason (no connection is considered success)
+ * Sets status variable for connection status
+ *
+ * Return:   0 - OK
+ *           1 - Error
+ *****************************************************************************/
 int SimModem::mqttDisconnect(){
-  Serial.println(readWaitResponse(AT_MQT_DIS,1000,"OK"));
+  String response = readWaitResponse(AT_MQT_DIS,1000,"OK");
+  if (statusMQTT == MODEM_STATUS_MQTT_CON || statusMQTT == MODEM_STATUS_MQTT_CFG){
+    statusMQTT = MODEM_STATUS_MQTT_CFG;
+    return 0;
+  }
+  else{
+    return 1;
+  }
   return 0;
 }
 
-/*
- * Read GPS string
- * No formatting
- * Return NEMA string
- */
+/******************************************************************************
+ * Read MQTT settings
+ * 
+ * Print the MQTT configuration and MQTT state.
+ *****************************************************************************/
 int SimModem::mqttStatus(){
   Serial.println(readResponse(AT_MQT_CFG,1000));
   Serial.println(readResponse(AT_MQT_STA,1000));
@@ -467,17 +495,24 @@ String SimModem::readClock(int format){
   }
 }
 
-/*
- * Response is 4 channels
- */
-String SimModem::readIP(){
-  String ipResponse = readResponse(AT_NET_ACT,0);
-  int ipAddressIndex = ipResponse.indexOf("1,\"");
+/******************************************************************************
+ * Read Active IP address
+ * 
+ * Response has 4 configurations
+ * Search for any active configuration independent of channel
+ *
+ * Return:   0 - OK
+ *          -1 - ERROR
+ *****************************************************************************/
+int SimModem::readIP(String &ipAddress){
+  ipAddress = readResponse(AT_NET_ACT,0);
+  int ipAddressIndex = ipAddress.indexOf("1,\"");
   if (ipAddressIndex >= 0){
-    return ipResponse.substring(ipAddressIndex+3,ipAddressIndex+15);
+    ipAddress.substring(ipAddressIndex+3,ipAddressIndex+15);
+    return 0;
   }
   else{
-    return "No Connection";
+    return -1;
   }
 }
 
@@ -721,8 +756,8 @@ int SimModem::ftpPut(String virtualFile, int option){
         SimModemSerial.readBytesUntil(':',buffer, MODEM_BUFFER);
         SimModemSerial.flush();
     }
-    responseString = readWaitResponse(AT_FTP_PDN,0,"OK");
-    //readResponse(AT_FTP_EXT,0);                                   // Disabled manual disconnect (MIGHT USE AGAIN)
+    responseString = readWaitResponse(AT_FTP_PDN,1000,"OK");
+    // Do not attempt manual disconnect (CAUSES ERRORS)
     if (responseString){
       return 0;
     }   
@@ -762,7 +797,7 @@ int SimModem::ftpPut(String dataString){
   SimModemSerial.flush();
   
   readWaitResponse(AT_FTP_PDN,10000,"FTPPUT: 1,0");
-  //readWaitResponse(AT_FTP_EXT,0,"FTPPUT: 1,80");
+  // Do not attempt manual disconnect (CAUSES ERRORS)
   return 0;
 }
 
@@ -863,14 +898,27 @@ String SimModem::ftpFile(){
   return readResponse(AT_FTP_PUT_NM1 + String("\"") + "test.txt" + String("\""),0);
 }
 
-/*
+/******************************************************************************
  * MQTT Server Subscribe
  * 
- */
+ *  Send the subscribe command (requires initialization)
+ *  Check response for error
+ *  Append response to input pointer
+ *
+ *  ERROR:  0 - ok
+ *          1 - error, connection exists
+ *          2 - error, message empty
+ *****************************************************************************/
 int SimModem::mqttSub(String &message){
-  readWaitResponse(AT_MQT_SUB,1000,"OK");
-  message.concat(readWaitResponse("",5000,"SMSUB:"));
-  return 0;
+  String response = readWaitResponse(AT_MQT_SUB,5000,"SMSUB:");
+  Serial.println("mqtt jim");
+  Serial.println(response);
+  if (response.indexOf("ERROR") < 0){
+    Serial.println("mqtt jeff");
+    statusMQTT = MODEM_STATUS_MQTT_SUB;
+    return 0;
+  }
+  return 1;
 }
 
 /*
@@ -882,7 +930,6 @@ int SimModem::mqttPub(){
   char temp = 'a';
   readResponse(AT_MQT_PUB1,0);
   SimModemSerial.print(temp);
-  readWaitResponse("",5000,"SMSUB");
   return 0;
 }
 
@@ -891,7 +938,58 @@ int SimModem::mqttPub(){
  * 
  */
 int SimModem::mqttUnsub(){
-  readResponse(AT_MQT_UNS,0);
+  String response = readResponse(AT_MQT_UNS,0);
+  if (response.indexOf("OK")){
+    return 0;
+  }
+  return -1;
+}
+
+/******************************************************************************
+ * MQTT Server Subscribe
+ * 
+ *  Send the subscribe command (requires initialization)
+ *  Check response for error
+ *  Append response to input pointer
+ *
+ *  ERROR:  0 - ok
+ *          1 - error, connection exists
+ *          2 - error, message empty
+ *****************************************************************************/
+int SimModem::mqttRead(String &message, int option){
+  String response;
+  if (statusMQTT == MODEM_STATUS_MQTT_UNKNOWN){
+    Serial.println("unknown");
+    response = readWaitResponse(AT_MQT_STA,1000,"SMSTATE:");  // Check the connection
+    if (response.indexOf("1") >= 0){                          // 1 = connected
+      statusMQTT = MODEM_STATUS_MQTT_CON;                     // Set status
+    }
+    // Device is not connected MQTT server
+    else{
+      Serial.println("not connect");
+      // Attempt to write configuration
+      if (startMQTT(option)){
+        Serial.println("fail start");
+        // Configuration failed, error returned
+        statusMQTT = MODEM_STATUS_MQTT_UNKNOWN;
+        return -1;
+      }
+    }
+  }
+  // Device might have been unknown and configured by previous
+  if (statusMQTT == MODEM_STATUS_MQTT_CFG){
+    Serial.println("connect");
+    mqttConnect();
+  }
+  // Device might already be connected
+  if (statusMQTT == MODEM_STATUS_MQTT_SUB){
+    Serial.println("unsubscribe");
+    mqttUnsub();
+  }
+  // Final step is to subscribe and read latest message
+  mqttSub(message);
+  Serial.println(message);
+  mqttUnsub();
   return 0;
 }
 

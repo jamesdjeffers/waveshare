@@ -35,16 +35,21 @@
   #define modemBaud                 115200
 #endif
 
-#define modemTimeout              200
-#define MODEM_TIMER_POWER_PULSE   2000              // Datasheet Ton mintues = 1.2S
-#define MODEM_TIMER_POWER_ON      15000
-#define MODEM_TIMER_POWER_OFF     5000
+#define modemTimeout                200
+#define MODEM_TIMER_POWER_PULSE     2000              // Datasheet Ton mintues = 1.2S
+#define MODEM_TIMER_POWER_ON        15000
+#define MODEM_TIMER_POWER_OFF       5000
 
-#define MODEM_STATUS_UNKNOWN      -3
-#define MODEM_STATUS_OFF          -2
-#define MODEM_STATUS_CONNECT      -1
-#define MODEM_STATUS_ON           0
-#define MODEM_STATUS_ERROR        1
+#define MODEM_STATUS_UNKNOWN        -3
+#define MODEM_STATUS_OFF            -2
+#define MODEM_STATUS_CONNECT        -1
+#define MODEM_STATUS_ON             0
+#define MODEM_STATUS_ERROR          1
+
+#define MODEM_STATUS_MQTT_UNKNOWN   -3
+#define MODEM_STATUS_MQTT_CFG       -2
+#define MODEM_STATUS_MQTT_CON       0
+#define MODEM_STATUS_MQTT_SUB       1
 
 #define MODEM_CMD_DELAY           10
 
@@ -185,8 +190,11 @@ class SimModem
 private:
   
   char buffer [1360] = "";
-  int status = MODEM_STATUS_UNKNOWN;  // Contains operation mode data (-3 = unknown, -2 = startup, -1 = connecting, 0 = on)
-  long timer = 0;                     // Used to track internal actions, stores millisecond timer
+  // Contains operation mode data (-3 = unknown, -2 = startup, -1 = connecting, 0 = on)
+  int status = MODEM_STATUS_UNKNOWN;
+  int statusMQTT = MODEM_STATUS_UNKNOWN;
+  // Used to track internal actions, stores millisecond timer
+  long timer = 0;                     
 
   String imei = "default";
   
@@ -227,7 +235,7 @@ public:
   String readClock(int format);
   String readClockID();
   
-  String readIP();
+  int readIP(String &ipAddress);
   String readIPPing();
   int enableIP();
   
@@ -257,6 +265,7 @@ public:
   int mqttPub();
   int mqttSub(String &message);
   int mqttUnsub();
+  int mqttRead(String &message, int option);
 
   int sslFileDownload(int option);
   int sslFileDownload(File dataFile, int option);

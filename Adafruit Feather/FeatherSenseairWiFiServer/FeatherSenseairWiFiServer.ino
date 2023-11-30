@@ -78,7 +78,7 @@ int intervalUpdate = 180000;                   // Write most recent data to FTP 
 int timerLastDataFile = 0;                // Millisecond timer value for last data upload
 int countLastDataFile = 0;
 
-int intervalCfg = 0;                      // Read timing configuration by FTP every 3 minutes
+int intervalCfg = 90000;                      // Read timing configuration by FTP every 3 minutes
 int timerLastCfg = 0;
 
 int intervalBackup = 0;                   // Backup the data file every 15 minutes
@@ -184,6 +184,18 @@ void setup() {
     Serial.println("Sensor failed");
   }
 
+  /* Device 4: GPS sensor   */
+  if (statusGPS == DEVICE_ENABLED){
+    control.enablePower(POWER_GPS);                     // Added for board 3 support
+    statusGPS = gpsSerial.init();
+    if (!statusGPS){
+      Serial.println("GPS Module initialized");
+    }
+    else{
+      Serial.println("GPS Module failed");
+    }
+  }
+
   // Create a data acquisition file based on the date
   if (statusSD >= 0){
     logger.fileNewName();
@@ -216,18 +228,6 @@ void setup() {
       else{
         logger.fileAddCSV((modem.readClock(0)+": Log File Upload Failed (Code) = " + String(currentFTP)),FILE_TYPE_LOG);
       }
-    }
-  }
-
-  /* Device 4: GPS sensor   */
-  if (statusGPS == DEVICE_ENABLED){
-    control.enablePower(POWER_GPS);                     // Added for board 3 support
-    statusGPS = gpsSerial.init();
-    if (!statusGPS){
-      Serial.println("GPS Module initialized");
-    }
-    else{
-      Serial.println("GPS Module failed");
     }
   }
 
@@ -410,7 +410,13 @@ void loop() {
     
     else if (serialCommand == "ip"){
       Serial.print("Simcom 7070G IP Address = ");
-      Serial.println(modem.readIP());
+      returnValue = modem.readIP(returnString);
+      if(!returnValue){
+        Serial.println(returnString);
+      }
+      else{
+        Serial.println("No Connection");
+      }
     }
     else if (serialCommand == "ping"){
       Serial.print("Simcom 7070G IP Ping = ");
@@ -728,12 +734,14 @@ void loop() {
         }
         // Successful FTP, record in log, set number bytes, reset timer 
         if (!returnValue){
+          Serial.println("Log File Upload Completed");
           logger.fileAddCSV((modem.readClock(0)+": Log upload (bytes) = " + String(logger.fileSize(FILE_TYPE_LOG))),FILE_TYPE_LOG);
           timerLastLog = millis();
           statusFTP = 0;
           lastFTPByteLog = fileSize;
         }
         else{
+          Serial.println("Log File Upload Failed");
           logger.fileAddCSV((modem.readClock(0)+": Log file upload failed"),2);
           statusFTP += 1;
         }
@@ -742,31 +750,45 @@ void loop() {
       //CONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIGCONFIG
       // Not updating the data file
       else if (intervalCfg && (millis()-timerLastCfg) > intervalCfg){
+        Serial.println("Configuration File Download Started");
         String json;
         if (MODE_CTRL == MODE_CFG_FTP){
-          modem.ftpGet(json);
+          returnValue = modem.ftpGet(json);
         }
         else {
-          modem.mqttSub(json);
+          returnValue = modem.mqttRead(json, 1);
         }
-        returnValue = updateConfig(json);
-        if (returnValue < -1){
-          logger.fileAddCSV((modem.readClock(0)+": Invalid settings"),2);
-          timerLastCfg = millis();
-          statusFTP = 0;
+        // Server connection test, success => 0
+        if (returnValue == 0){
+          returnValue = updateConfig(json);
+          if (returnValue < -1){
+            Serial.println("Configuration File Download Failed");
+            logger.fileAddCSV((modem.readClock(0)+": Invalid settings"),2);
+            timerLastCfg = millis();
+            statusFTP += 1;
+          }
+          else if (returnValue == -1){
+            Serial.println("Configuration File Download Invalid");
+            logger.fileAddCSV((modem.readClock(0)+": Config Download: Invalid file"),2);
+            timerLastCfg = millis();
+          }
+          else if (returnValue >0){
+            Serial.println("Configuration File Download Completed");
+            logger.fileAddCSV((modem.readClock(0)+": Settings Updated = " + settingsString()),2);
+            timerLastCfg = millis();
+            statusFTP = 0;
+          }
+          else{
+            statusFTP = 0;
+            timerLastCfg = millis();
+          }
         }
-        else if (returnValue == -1){
-          logger.fileAddCSV((modem.readClock(0)+": Config Download: Invalid file"),2);
-          statusFTP += 1;
-        }
-        else if (returnValue >0){
-          logger.fileAddCSV((modem.readClock(0)+": Settings Updated = " + settingsString()),2);
-          timerLastCfg = millis();
-          statusFTP = 0;
-        }
+        // Server connection test, failure => -1
         else{
-          statusFTP = 0;
+          Serial.println("Configuration File Download Failed");
+          logger.fileAddCSV((modem.readClock(0)+": Configuration update failed"),2);
           timerLastCfg = millis();
+          statusFTP += 1;
         }
       }
       //BACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUPBACKUP
@@ -840,8 +862,8 @@ int updateConfig(String json){
   int change = 0;
   
   // Empty string indicates file not opened
-  if (json.length() < 20){
-    return 0;
+  if (json.length() == 0){
+    return -2;
   }
   found = json.indexOf("intervalData=");
   if (found >= 0){
@@ -895,7 +917,7 @@ int updateConfig(String json){
     }
     return change;
   }
-  return -2;
+  return -1;
 }
 
 /*
