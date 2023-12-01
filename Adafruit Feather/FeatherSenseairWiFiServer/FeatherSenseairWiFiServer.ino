@@ -78,7 +78,7 @@ int intervalUpdate = 180000;                   // Write most recent data to FTP 
 int timerLastDataFile = 0;                // Millisecond timer value for last data upload
 int countLastDataFile = 0;
 
-int intervalCfg = 90000;                      // Read timing configuration by FTP every 3 minutes
+int intervalCfg = 360000;                      // Read timing configuration by FTP every 3 minutes
 int timerLastCfg = 0;
 
 int intervalBackup = 0;                   // Backup the data file every 15 minutes
@@ -482,11 +482,19 @@ void loop() {
     }
     else if (serialCommand == "ssl pem test"){
       Serial.println("Simcom 7070G Network SSL Test file = ");
-      Serial.println(modem.sslFileDownload(2));
+      Serial.println(modem.sslFileDownload(0));
     }
     else if (serialCommand == "ssl version"){
       Serial.println("Simcom 7070G Network SSL Type = ");
       modem.sslVersion();
+    }
+    else if (serialCommand == "ssl cipher"){
+      Serial.println("Simcom 7070G Network SSL Cipher Suite = ");
+      modem.sslCipher();
+    }
+    else if (serialCommand == "ssl ctindex"){
+      Serial.println("Simcom 7070G Network SSL Cipher Suite = ");
+      modem.sslCtindex();
     }
     else if (serialCommand == "ssl convert1"){
       Serial.println("Simcom 7070G Network SSL Key file = ");
@@ -499,6 +507,10 @@ void loop() {
     else if (serialCommand == "ssl convert3"){
       Serial.println("Simcom 7070G Network SSL CRT file = ");
       Serial.println(modem.sslConvert(2));
+    }
+    else if (serialCommand == "ssl configure"){
+      Serial.println("Simcom 7070G Network SSL Configuration = ");
+      Serial.println(modem.sslConfigure(0));
     }
 
     //********************************************************************************
@@ -583,6 +595,11 @@ void loop() {
       modem.startMQTT(1);
       modem.mqttStatus();
     }
+    else if (serialCommand == "mqtt start 2"){
+      Serial.print("Simcom 7070G MQTT Start = ");
+      modem.startMQTT(2);
+      modem.mqttStatus();
+    }
     else if (serialCommand == "mqtt status"){
       Serial.print("Simcom 7070G MQTT Status = ");
       modem.mqttStatus();
@@ -597,8 +614,20 @@ void loop() {
       modem.mqttDisconnect();
     }
     else if (serialCommand == "mqtt pub"){
-      Serial.print("Simcom 7070G MQTT Publish = ");
-      modem.mqttPub();
+      Serial.print("Simcom 7070G MQTT Publish \"a\" ");
+      modem.mqttPub("",0);
+    }
+    else if (serialCommand == "mqtt pub 0"){
+      Serial.print("Simcom 7070G MQTT Publish \"Test\" ");
+      modem.mqttPub("Test",1);
+    }
+    else if (serialCommand == "mqtt pub 1"){
+      Serial.print("Simcom 7070G MQTT Publish Data = ");
+      modem.mqttPub(dataString,1);
+    }
+    else if (serialCommand == "mqtt pub 2"){
+      Serial.print("Simcom 7070G MQTT Publish Config = ");
+      modem.mqttPub(settingsString(),1);
     }
     else if (serialCommand == "mqtt sub"){
       Serial.print("Simcom 7070G MQTT Subscribe = ");
@@ -609,6 +638,10 @@ void loop() {
     else if (serialCommand == "mqtt unsub"){
       Serial.print("Simcom 7070G MQTT Unsubscribe = ");
       modem.mqttUnsub();
+    }
+    else if (serialCommand == "mqtt read"){
+      Serial.print("Simcom 7070G MQTT Read = ");
+      modem.mqttRead(dataString,1);
     }
 
     //*********************************************************************************

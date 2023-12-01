@@ -369,10 +369,21 @@ int SimModem::startMQTT(int option){
     readResponse(AT_MQT_TIM,0);
     readResponse(AT_MQT_CSS,0);
   }
+  // Option 1 is anonymous, no encryption test
   else if (option == 1){
     readResponse(MQTT_SERVER_TEST_BASIC,0);
-    readResponse(MQTT_UN,0);
-    readResponse(MQTT_PWD,0);
+    readResponse(MQTT_UN_ANON,0);
+    readResponse(MQTT_PWD_ANON,0);
+    readResponse(MQTT_ID,0);
+    readResponse(AT_SSL_SNI_MOSQ,0);
+    readResponse(AT_MQT_TIM,0);
+    readResponse(AT_MQT_CSS,0);
+    readResponse(AT_MQT_TOP,0);
+  }
+  else if (option == 2){
+    readResponse(MQTT_SERVER_TEST_SSL,0);
+    readResponse(MQTT_UN_ANON,0);
+    readResponse(MQTT_PWD_ANON,0);
     readResponse(MQTT_ID,0);
     readResponse(AT_SSL_SNI_MOSQ,0);
     readResponse(AT_MQT_TIM,0);
@@ -910,11 +921,8 @@ String SimModem::ftpFile(){
  *          2 - error, message empty
  *****************************************************************************/
 int SimModem::mqttSub(String &message){
-  String response = readWaitResponse(AT_MQT_SUB,5000,"SMSUB:");
-  Serial.println("mqtt jim");
-  Serial.println(response);
-  if (response.indexOf("ERROR") < 0){
-    Serial.println("mqtt jeff");
+  message = readWaitResponse(AT_MQT_SUB,5000,"SMSUB:");
+  if (message.indexOf("ERROR") < 0){
     statusMQTT = MODEM_STATUS_MQTT_SUB;
     return 0;
   }
@@ -925,11 +933,21 @@ int SimModem::mqttSub(String &message){
  * MQTT Server Publish
  * 
  */
-int SimModem::mqttPub(){
-  //char temp[5] = '12345';
+int SimModem::mqttPub(String message, int option){
+  // Test variable for index of string
   char temp = 'a';
-  readResponse(AT_MQT_PUB1,0);
-  SimModemSerial.print(temp);
+  if (option == 0){
+    readResponse(AT_MQT_PUB1,0);
+    SimModemSerial.print(temp);
+  }
+  else if (option == 1){
+    String ATpubMessage = AT_MQT_PUBX + String(message.length()) + AT_MQT_PUBY;
+    readResponse(ATpubMessage,0);
+    for (int i = 0; i < message.length(); i++){
+      temp = message[i];
+      SimModemSerial.print(temp);
+    }
+  }
   return 0;
 }
 
@@ -1055,9 +1073,9 @@ int SimModem::checkFTP(){
   }
 }
 
-/*
+/******************************************************************************
  * SSL Functions
- */
+ *****************************************************************************/
 int SimModem::sslFileDownload(File dataFile, int option){
   if (option == 0){
     Serial.println(readResponse(AT_SSL_FL1,0));
@@ -1102,6 +1120,12 @@ int SimModem::sslFileDownload(int option){
   return 0;
 }
 
+/******************************************************************************
+ * SSL File Convert
+ * Use the current SSL configuration to convert a certificate file
+ *
+ * Return: not implemented
+ *****************************************************************************/
 int SimModem::sslConvert(int option){
   if (option == 0){
     Serial.println(readResponse(AT_SSL_CV1,0));
@@ -1120,18 +1144,71 @@ int SimModem::sslCipher(){
   return 0;
 }
 
-int SimModem::sslSni(){
-  Serial.println(readResponse(AT_SSL_SNI_HIVE,0));
+/******************************************************************************
+ * SSL Configuration
+ * Set the current SSL configuration SNI value
+ *
+ * Return: not implemented
+ *****************************************************************************/
+int SimModem::sslSni(String &message, int option){
+  message = readResponse(AT_SSL_SNI_HIVE,0);
   return 0;
 }
 
+/******************************************************************************
+ * SSL Configuration
+ * Set the current SSL configuration index value
+ *
+ * Return: not implemented
+ *****************************************************************************/
 int SimModem::sslCtindex(){
   Serial.println(readResponse(AT_SSL_CTX,0));
   return 0;
 }
 
+/******************************************************************************
+ * SSL Configuration
+ * Set the current SSL configuration TLS version value
+ *
+ * Return: not implemented
+ *****************************************************************************/
 int SimModem::sslVersion(){
   Serial.println(readResponse(AT_SSL_VER,0));
+  return 0;
+}
+
+/******************************************************************************
+ * SSL Configuration
+ * Set the current SSL configuration TLS version value
+ *
+ * Return: not implemented
+ *****************************************************************************/
+int SimModem::sslConfigure(int option){
+  String responseString = "";
+  if (option == 0){
+    startCFS();                               // CFS init
+    sslFileDownload(0);                       // CFS write file
+    stopCFS();                                // CFS term
+    startMQTT(2);                             // MQTT Configuration includes ?sni?
+    readResponse(AT_SSL_VER,0);               // SSL version
+    readResponse(AT_SSL_CIP,0);               // SSL ciphersuite
+    
+    sslConvert(0);                            // SSL convert
+    readResponse(AT_SSL_CTX,0);               // SSL Configutation index (default 1)
+    
+  }
+  else if (option == 1){
+    startCFS();                               // CFS init
+    readResponse(AT_SSL_VER,0);               // CFS write file
+    readResponse(AT_SSL_VER,0);               // CFS write file
+    readResponse(AT_SSL_VER,0);               // CFS write file
+    stopCFS();                                // CFS term
+    readResponse(AT_SSL_VER,0);               // SSL version
+    readResponse(AT_SSL_VER,0);               // SSL ciphersuite
+    readResponse(AT_SSL_VER,0);               // SSL sni
+    readResponse(AT_SSL_VER,0);               // SSL Convert 
+    readResponse(AT_SSL_VER,0);               // SSL Convert key file
+  }
   return 0;
 }
 

@@ -145,16 +145,18 @@
 #define AT_GPS_OFF "AT+CGNSPWR=0"
 #define AT_GPS_RD  "AT+CGNSINF"
 
-#define AT_MQT_URL        "AT+SMCONF=\"URL\",b97b659315cf4f0cafd48b90e3421aa6.s2.eu.hivemq.cloud,6000"
-#define AT_MQT_URL_MOSQ   "AT+SMCONF=\"URL\",test.mosquitto.org,6000"
-#define AT_MQT_TIM        "AT+SMCONF=\"KEEPTIME\",60"
-#define AT_MQT_CSS        "AT+SMCONF=\"CLEANSS\",1"
-#define AT_MQT_CLI        "AT+SMCONF=\"CLIENTID\",\"dev0\""
-#define AT_MQT_TOP        "AT+SMCONF=\"TOPIC\",aimnet"
-#define AT_MQT_CON        "AT+SMCONN"
-#define AT_MQT_SUB        "AT+SMSUB=\"aimnet\",1"
-#define AT_MQT_PUB5        "AT+SMPUB=\"aimnet\",5,1,1"
-#define AT_MQT_PUB1        "AT+SMPUB=\"aimnet\",1,1,1"
+#define AT_MQT_URL          "AT+SMCONF=\"URL\",b97b659315cf4f0cafd48b90e3421aa6.s2.eu.hivemq.cloud,6000"
+#define AT_MQT_URL_MOSQ     "AT+SMCONF=\"URL\",test.mosquitto.org,6000"
+#define AT_MQT_TIM          "AT+SMCONF=\"KEEPTIME\",60"
+#define AT_MQT_CSS          "AT+SMCONF=\"CLEANSS\",1"
+#define AT_MQT_CLI          "AT+SMCONF=\"CLIENTID\",\"dev0\""
+#define AT_MQT_TOP          "AT+SMCONF=\"TOPIC\",aimnet"
+#define AT_MQT_CON          "AT+SMCONN"
+#define AT_MQT_SUB          "AT+SMSUB=\"aimnet\",1"
+#define AT_MQT_PUB5         "AT+SMPUB=\"aimnet\",5,1,1"
+#define AT_MQT_PUB1         "AT+SMPUB=\"aimnet\",1,1,1"
+#define AT_MQT_PUBX         "AT+SMPUB=\"aimnet\","
+#define AT_MQT_PUBY         ",1,1"
 #define AT_MQT_UNS        "AT+SMUNSUB=\"aimnet\""
 #define AT_MQT_DIS        "AT+SMDISC"
 #define AT_MQT_STA        "AT+SMSTATE?"
@@ -163,7 +165,7 @@
 #define AT_SSL_VER        "AT+CSSLCFG=\"sslversion\",1,3"
 #define AT_SSL_CIP        "AT+CSSLCFG=\"ciphersuite\",1,0,\"0xc02f\""
 #define AT_SSL_SNI_HIVE   "AT+CSSLCFG=\"sni\",1,b97b659315cf4f0cafd48b90e3421aa6.s2.eu.hivemq.cloud"
-#define AT_SSL_SNI_MOSQ   "AT+CSSLCFG=\"sni\",1,test.mosquitto.org"
+#define AT_SSL_SNI_MOSQ   "AT+CSSLCFG=\"sni\",1,mosquitto.org.crt"
 #define AT_SSL_CTX        "AT+CSSLCFG=\"ctxindex\",1"
 
 #define AT_SSL_CV1        "AT+CSSLCFG=\"convert\",1,\"myclient.crt\",\"myclient.key\""
@@ -262,7 +264,7 @@ public:
   int mqttStatus();
   int mqttConnect();
   int mqttDisconnect();
-  int mqttPub();
+  int mqttPub(String message, int option);
   int mqttSub(String &message);
   int mqttUnsub();
   int mqttRead(String &message, int option);
@@ -274,8 +276,9 @@ public:
 
   int sslCipher();
   int sslCtindex();
-  int sslSni();
+  int sslSni(String &message, int option);
   int sslVersion();
+  int sslConfigure(int option);
 
   int httpRead();
   int httpSSL();
