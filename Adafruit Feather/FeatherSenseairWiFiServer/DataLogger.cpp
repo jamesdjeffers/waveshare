@@ -60,6 +60,9 @@ int DataLogger::fileDump(int option){
     else if (option == FILE_TYPE_LOG){
       temp = logName;
     }
+    else if (option == FILE_TYPE_STATUS){
+      temp = STATUS_DATA;
+    }
     else if (option == FILE_TYPE_CRT) {
       temp = CRT_FILE_NAME;
     }
@@ -358,7 +361,7 @@ File DataLogger::fileOpen(int option){
       return SD.open(logName);
     }
     else if (option == FILE_TYPE_STATUS) {
-      return SD.open(fileName);
+      return SD.open(STATUS_DATA);
     }
     else if (option == FILE_TYPE_CRT) {
       return SD.open(CRT_FILE_NAME);
@@ -382,7 +385,7 @@ File DataLogger::fileOpen(int option){
 }
 
 /*
- * opens one of the file objects associated with current data stream
+ * Returns the string from the virtual file associated with option
  * 
  * Input Option (type definitions)
  */

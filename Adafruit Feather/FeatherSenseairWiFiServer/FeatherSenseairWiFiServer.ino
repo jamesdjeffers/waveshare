@@ -74,18 +74,19 @@ int timerLastRead = 0;                        // Millisecond timer value for las
 
 int intervalFile = DEVICE_ENABLED;        // Status variable to enable/disable code options
 
-int intervalUpdate = 180000;                   // Write most recent data to FTP server every 3 minutes
+int intervalUpdate = 0;                   // Write most recent data to FTP server every 3 minutes
 int timerLastDataFile = 0;                // Millisecond timer value for last data upload
 int countLastDataFile = 0;
 
-int intervalCfg = 360000;                      // Read timing configuration by FTP every 3 minutes
+int intervalCfg = 0;                      // Read timing configuration by FTP every 3 minutes
 int timerLastCfg = 0;
 
 int intervalBackup = 0;                   // Backup the data file every 15 minutes
 int LastFileUpload = 0;
 int lastFTPByteBackup = 0;
 
-int intervalLog = 120000;                // Update the system event log every 60 minutes
+int firstLog = DEVICE_DISABLED;
+int intervalLog = 0;                // Update the system event log every 60 minutes
 int timerLastLog = 0;                     // Timer value in milliseconds for last log FTP
 int lastFTPByteLog = 0;                   // Number of bytes current log succussful FTP
 
@@ -109,7 +110,7 @@ bool fileSizeLimit = false;               // Number of bytes before a new file i
 bool dataSizeLimit = false;               // Number of bytes stored locally before modem is activated
 
 GPSSerial gpsSerial;
-int statusGPS = DEVICE_ENABLED;
+int statusGPS = DEVICE_DISABLED;
 int statusClock = 0;
 
 // Serial port parser
@@ -141,17 +142,22 @@ void setup() {
       logger.logNewName();
       logger.fileAddCSV("**********************************************",2);
       logger.fileAddCSV(SW_VER_NUM,2);
-      logger.fileAddCSV(("Settings: " + settingsString()),FILE_TYPE_LOG);
-
+      
+      // Check for settings file on SD
       if (!readStatus()){
+        logger.fileAddCSV(("Default Settings: " + settingsString()),FILE_TYPE_LOG);
         writeStatus();
       }
+      else {
+        logger.fileAddCSV(("SD Card Settings: " + settingsString()),FILE_TYPE_LOG);
+      }
+      
     }
     else if (statusSD > 0){
       Serial.println("Not Present, Virtual Device Enabled");
       logger.fileAddCSV("**********************************************",2);
       logger.fileAddCSV(SW_VER_NUM,FILE_TYPE_LOG);
-      logger.fileAddCSV(("Settings: " + settingsString()),FILE_TYPE_LOG);
+      logger.fileAddCSV(("Default Settings: " + settingsString()),FILE_TYPE_LOG);
       logger.fileAddCSV(("Memory: Virtual SD card"),FILE_TYPE_LOG);
     }
     else{
@@ -203,7 +209,7 @@ void setup() {
   }
   
   // Completed startup, if internet connection available store system log
-  if (!statusModem){
+  if (firstLog && !statusModem){
     Serial.println("Log File Upload Started");
     if (statusSD == FILE_REAL){
       File tempFile = logger.fileOpen(FILE_TYPE_LOG);
@@ -331,6 +337,14 @@ void loop() {
     else if (serialCommand == "file log"){
       Serial.println("Log File: ");
       logger.fileDump(FILE_TYPE_LOG);                 // Log file
+    }
+    else if (serialCommand == "file status"){
+      Serial.println("Status File: ");
+      logger.fileDump(FILE_TYPE_STATUS);                 // Log file
+    }
+    else if (serialCommand == "file status load"){
+      Serial.println("Status File: ");
+      readStatus();                                     // Log file
     }
     else if (serialCommand == "file cert"){
       Serial.println("Certificate File: ");
@@ -953,27 +967,43 @@ int updateConfig(String json){
   return -1;
 }
 
-/*
+/******************************************************************************
  * Parse the status file
- */
+ *
+ * Search input string for variable tags
+ * Only update found elements, ignore missing elements
+
+ * Error: Invalid values for 
+ *****************************************************************************/
 
 int readStatus(){
   String json;
-  File statusFile = logger.fileOpen(FILE_TYPE_STATUS);
+  File statusFile = logger.fileOpen(FILE_TYPE_LOG);
 
   while(statusFile.available()){
-    json+=statusFile.read();
+    Serial.print(String(statusFile.read()));
+    //json.concat(statusFile.read());
+  }
+  statusFile = logger.fileOpen(FILE_TYPE_STATUS);
+
+  while(statusFile.available()){
+    Serial.print(statusFile.read());
+    //json.concat(statusFile.read());
   }
   
   int found = json.indexOf(STATUS_TAG_FILE);
   String result = json.substring(found+14,json.indexOf(";",found+14));
   countLastDataFile = result.toInt();
   statusFile.close();
-  return 0;
+
+  Serial.println(json);
+
+  return updateConfig(json);
 }
 
 int writeStatus(){
   String json = STATUS_TAG_FILE + String(countLastDataFile) + ";";
+  json.concat(settingsString());
   logger.fileAddCSV(json,FILE_TYPE_STATUS);
   return 0;
 }
@@ -983,7 +1013,7 @@ int writeStatus(){
  */
 
 String settingsString(){
-  return "intervalData=" + String(intervalData) + ",intervalFTP=" + String(intervalUpdate) + 
-         ",intervalCfg=" + String(intervalCfg) + ",intervalLog=" + String(intervalLog)+ 
-         ",intervalBackup=" + String(intervalBackup);
+  return "intervalData=" + String(intervalData) + ";intervalFTP=" + String(intervalUpdate) + 
+         ";intervalCfg=" + String(intervalCfg) + ";intervalLog=" + String(intervalLog)+ 
+         ";intervalBackup=" + String(intervalBackup);
 }

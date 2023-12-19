@@ -23,7 +23,7 @@
 #define modemRX                   21
 #define modemTX                   20
 
-#define BOARD                     0                   // Version 0 = Waveshare, Version 1 = And-Global
+#define BOARD                     1                   // Version 0 = Waveshare, Version 1 = And-Global
 
 #if BOARD == 0
   #define MODEM_PWR_ON              HIGH
