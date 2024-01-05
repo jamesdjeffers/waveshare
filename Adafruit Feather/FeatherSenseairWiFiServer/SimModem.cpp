@@ -360,7 +360,9 @@ int SimModem::startFTP(){
 
 /*
  * Set the MQTT configuration
- * No formatting
+ * Input: option
+ *    0 = HiveMQ server
+ *    1 = Unencrypted test server (mosquitto.org)
  * Return NEMA string
  */
 int SimModem::startMQTT(int option){
@@ -947,7 +949,7 @@ int SimModem::mqttSub(String &message){
  */
 int SimModem::mqttPub(String message, int option){
   // Test variable for index of string
-  char temp = 'a';
+  char temp = 'b';
   if (option == 0){
     readResponse(AT_MQT_PUB1,0);
     SimModemSerial.print(temp);
@@ -976,9 +978,9 @@ int SimModem::mqttUnsub(){
 }
 
 /******************************************************************************
- * MQTT Server Subscribe
+ * MQTT Server Read
  * 
- *  Send the subscribe command (requires initialization)
+ *  Check status, configure is necessary
  *  Check response for error
  *  Append response to input pointer
  *
@@ -1016,10 +1018,67 @@ int SimModem::mqttRead(String &message, int option){
     Serial.println("unsubscribe");
     mqttUnsub();
   }
+  // Need to change to configuration topic
+  readResponse(AT_MQT_TOP,0);
+  delay(100);
   // Final step is to subscribe and read latest message
   mqttSub(message);
   Serial.println(message);
-  mqttUnsub();
+  //mqttUnsub();
+  return 0;
+}
+
+/******************************************************************************
+ * MQTT Server Publish
+ * 
+ *  Check status, configure is necessary
+ *  Check response for error
+ *  Append response to input pointer
+ *
+ *  ERROR:  0 - ok
+ *          1 - error, connection exists
+ *          2 - error, message empty
+ *****************************************************************************/
+int SimModem::mqttWrite(String &message, int option){
+  String response;
+  if (statusMQTT == MODEM_STATUS_MQTT_UNKNOWN){
+    Serial.println("unknown");
+    response = readWaitResponse(AT_MQT_STA,1000,"SMSTATE:");  // Check the connection
+    if (response.indexOf("1") >= 0){                          // 1 = connected
+      statusMQTT = MODEM_STATUS_MQTT_CON;                     // Set status
+    }
+    // Device is not connected MQTT server
+    else{
+      Serial.println("not connect");
+      // Attempt to write configuration
+      if (startMQTT(option)){
+        Serial.println("fail start");
+        // Configuration failed, error returned
+        statusMQTT = MODEM_STATUS_MQTT_UNKNOWN;
+        return -1;
+      }
+    }
+  }
+  // Device might have been unknown and configured by previous
+  if (statusMQTT == MODEM_STATUS_MQTT_CFG){
+    Serial.println("connect");
+    mqttConnect();
+  }
+  // Device might already be connected
+  if (statusMQTT == MODEM_STATUS_MQTT_SUB){
+    Serial.println("unsubscribe");
+    mqttUnsub();
+  }
+  // Change topic to device specific
+  String topicID = AT_MQT_TOP;
+  //topicID.concat("_" + imei.substring(12,15));
+  Serial.println(topicID);
+  Serial.println(readResponse(topicID,0));
+  delay(100);
+  // Final step is to subscribe and read latest message
+  mqttPub(message,1);
+  Serial.println(message);
+  //mqttUnsub();
   return 0;
 }
 

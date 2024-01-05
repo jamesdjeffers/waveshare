@@ -744,6 +744,10 @@ void loop() {
       }
     }
     
+    // MQTT
+    //returnValue = modem.mqttRead(returnString, 1);
+    returnValue = modem.mqttWrite(dataString, 1);
+
     //FTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTP
     // Update the data file on the FTP server
     if (intervalUpdate && (millis()-timerLastDataFile) > intervalUpdate){

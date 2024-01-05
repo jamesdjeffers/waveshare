@@ -267,7 +267,10 @@ public:
   int mqttPub(String message, int option);
   int mqttSub(String &message);
   int mqttUnsub();
+  
+  // High level read-write commands that include configuration and reset commands
   int mqttRead(String &message, int option);
+  int mqttWrite(String &message, int option);
 
   int sslFileDownload(int option);
   int sslFileDownload(File dataFile, int option);
