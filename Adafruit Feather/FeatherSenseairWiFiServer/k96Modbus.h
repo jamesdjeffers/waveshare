@@ -32,17 +32,17 @@
 #define K96_DATA_SIZE   12      // Modbus read operations are 6 + "reply" bytes long
 #define K96_DATA_RAW    10
 
-#define BOARD               2
+#define PCB_VERSION               2
 
-#if BOARD == 0
+#if PCB_VERSION == 0
   #define K96_POWER      5      // Device enable pin
   #define K96_TX        11      // Sercom1 receive pin
   #define K96_RX        10      // Sercom1 transmit pin
-#elif BOARD == 1
+#elif PCB_VERSION == 1
   #define K96_POWER     A0      // Device enable pin
   #define K96_TX         0      // Sercom1 receive pin
   #define K96_RX         1      // Sercom1 transmit pin
-#elif BOARD == 2
+#elif PCB_VERSION == 2
   #define K96_POWER     A0      // Device enable pin
   #define K96_TX         0      // Sercom1 receive pin
   #define K96_RX         1      // Sercom1 transmit pin

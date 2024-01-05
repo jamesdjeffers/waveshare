@@ -34,7 +34,7 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#define SW_VER_NUM          "Firmware v0.10.1"
+#define SW_VER_NUM          "Firmware v0.10.2"
 #include "secrets.h"
 
 #include "SystemControl.h"
@@ -81,7 +81,7 @@ int countLastDataFile = 0;
 int intervalCfg = 0;                      // Read timing configuration by FTP every 3 minutes
 int timerLastCfg = 0;
 
-int intervalBackup = 0;                   // Backup the data file every 15 minutes
+int intervalBackup = 180000;                   // Backup the data file every 15 minutes
 int LastFileUpload = 0;
 int lastFTPByteBackup = 0;
 
@@ -91,7 +91,7 @@ int timerLastLog = 0;                     // Timer value in milliseconds for las
 int lastFTPByteLog = 0;                   // Number of bytes current log succussful FTP
 
 SystemControl control;                    // Enables external DC power supplies for fan, pump, etc.
-int powerSave = DEVICE_ENABLED;           // Track the ability to turn off the modem bewteen uploads
+int powerSave = DEVICE_DISABLED;           // Track the ability to turn off the modem bewteen uploads
 bool powerFan = true;                     // Enable signal for hardware buck converter
 bool powerPump = true;                    // Enable signal for hardware buck converter
 
@@ -106,7 +106,7 @@ int statusSensor = DEVICE_ENABLED;        // System will always try to communica
 
 DataLogger logger;                        // Physical or virtual (saves data in RAM without card)
 int statusSD = DEVICE_ENABLED;            // Maximum 1024 files, filename length =< 8
-bool fileSizeLimit = false;               // Number of bytes before a new file is created
+bool fileSizeLimit = true;               // Number of bytes before a new file is created
 bool dataSizeLimit = false;               // Number of bytes stored locally before modem is activated
 
 GPSSerial gpsSerial;
@@ -582,14 +582,20 @@ void loop() {
     }
     else if (serialCommand == "ftp log"){
       Serial.print("Simcom 7070G FTP Put File = ");
+      Serial.println(logger.fileRead(FILE_TYPE_LOG));
       File tempFile = logger.fileOpen(FILE_TYPE_LOG);
-      Serial.println(modem.ftpPut(tempFile,0));
+      Serial.println(modem.ftpPut(tempFile,FILE_TYPE_LOG));
       tempFile.close();
+    }
+    else if (serialCommand == "ftp log string"){
+      Serial.print("Simcom 7070G FTP Put File = ");
+      String temp = logger.fileRead(FILE_TYPE_LOG);
+      Serial.println(modem.ftpPut(temp,FILE_TYPE_LOG));
     }
     else if (serialCommand == "s"){
       Serial.print("Simcom 7070G FTP Put File = ");
-      File tempFile = logger.fileOpen(0);
-      Serial.println(modem.ftpPut(tempFile,0));
+      File tempFile = logger.fileOpen(FILE_TYPE_DATA);
+      Serial.println(modem.ftpPut(tempFile,FILE_TYPE_DATA));
       tempFile.close();
     }
     else if (serialCommand == "S"){
@@ -842,9 +848,9 @@ void loop() {
       // Upload the dated CSV file
       else if (((intervalBackup && (millis()-LastFileUpload) > intervalBackup)) || dataSizeLimit){
         
-        File tempFile = logger.fileOpen(0);
+        File tempFile = logger.fileOpen(FILE_TYPE_DATA);
         tempFile.seek(lastFTPByteBackup);
-        returnValue = modem.ftpPut(tempFile,0);
+        returnValue = modem.ftpPut(tempFile,FILE_TYPE_DATA);
 
         // Check if file was uploaded correctly
         if (!returnValue){

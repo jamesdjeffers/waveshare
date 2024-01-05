@@ -41,7 +41,7 @@ int k96Modbus::init(){
   
   sensorSerial.begin(K96_BAUD,SERIAL_8N2);
   sensorSerial.setTimeout(K96_TIMEOUT);
-  if (BOARD == 0){
+  if (PCB_VERSION == 0){
     pinPeripheral(K96_TX, PIO_SERCOM);       // Assign TX function to pin
     pinPeripheral(K96_RX, PIO_SERCOM);       // Assign RX function to pin
   }

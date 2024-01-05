@@ -1,6 +1,6 @@
 /*
   SimModem.h - Library for sending AT+ commans to the Simcom7070G modem
-  Copyright (c) 2022 Jeffers Emerging Technologies, LLC.  All right reserved.
+  Copyright (c) 2023 University of Oklahoma,  All right reserved.
 
   This library is free software; you can redistribute it and/or
   modify it under the terms of the GNU Lesser General Public

@@ -48,6 +48,7 @@ int SimModem::init()
   pinPeripheral(modemRX, PIO_SERCOM);         // Assign RX function
   pinPeripheral(modemTX, PIO_SERCOM);         // Assign TX function
   pinMode(MODEM_POWER,OUTPUT);                // Control pin for power on, off, and reset
+  digitalWrite(MODEM_POWER, MODEM_PWR_OFF);   // Set to "off" value (default != "off" for all devices)
     
   powerOn();                                  // Need to check for device on, off, not present
   
@@ -217,6 +218,8 @@ int SimModem::powerOn(){
   if (status >= -1){
     // Check if device is on by disabling echo mode
     SimModemSerial.flush();
+    responseString = readResponse(ATE_OFF,0);
+    responseString = readResponse(ATE_OFF,0);
     responseString = readResponse(ATE_OFF,0);
     if(responseString != ""){
       return 0;
@@ -669,6 +672,7 @@ int SimModem::ftpPut(File dataFile, int option){
 
   String putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + readClock(2) + "_" + dataFile.name() + String("\"");
   readWaitResponse(putFileName,3000,"OK");
+  readResponse(AT_FTP_PUT_QNM,100);                                     // ERROR: Delay needed? or verifies set name
 
   responseString = readWaitResponse(AT_FTP_PUT,3000,"FTPPUT:");         // Start FTP session
 
@@ -683,7 +687,7 @@ int SimModem::ftpPut(File dataFile, int option){
       if (responseString.indexOf("2,") < 0){                            // If transmission failed break loop
         Serial.println(responseString);
         Serial.println("Error");
-        break;
+        return -1;
       }
       for (int j = 0; j < MODEM_BUFFER; j++){
         temp = dataFile.read();
@@ -693,17 +697,21 @@ int SimModem::ftpPut(File dataFile, int option){
       SimModemSerial.readBytesUntil(':',buffer, MODEM_BUFFER);
       SimModemSerial.flush();
     }
-    if (lastPutSize){                                                 // Last cycle to write data less than maximum number of bytes
-      Serial.println("test");
-      readWaitResponse(lastPutString,3000,"FTPPUT:");                 // 
-      for (int j = 0; j < lastPutSize; j++){
+    if (lastPutSize){                                                    // Last cycle to write data less than maximum number of bytes
+      responseString =  readWaitResponse(lastPutString,3000,"FTPPUT:");  // 
+      if (responseString.indexOf("2,") < 0){                             // If transmission failed break loop
+        Serial.println(responseString);
+        Serial.println("Error");
+        return -1;
+      }
+      for (int j = 0; j < lastPutSize; j++){                            // Iterate over the remaining bytes
           temp = dataFile.read();
           SimModemSerial.print(temp);
         }
         SimModemSerial.readBytesUntil(':',buffer, MODEM_BUFFER);
         SimModemSerial.flush();
     }
-    responseString = readWaitResponse(AT_FTP_PDN,0,"OK");
+    responseString = readWaitResponse(AT_FTP_PDN,1000,"OK");
     //readResponse(AT_FTP_EXT,0);                                   // Disabled manual disconnect (MIGHT USE AGAIN)
     if (responseString){
       return 0;
@@ -748,7 +756,7 @@ int SimModem::ftpPut(String virtualFile, int option){
       responseString = readWaitResponse(AT_FTP_PWX,3000,"FTPPUT:");     // Wait for data ready acknowledgement
       if (responseString.indexOf("2,") < 0){                            // If transmission failed break loop
         Serial.println("Error");
-        break;
+        return -1;
       }
       for (int j = 0; j < MODEM_BUFFER; j++){
         temp = virtualFile[j+i*MODEM_BUFFER];
@@ -758,8 +766,12 @@ int SimModem::ftpPut(String virtualFile, int option){
       SimModemSerial.readBytesUntil(':',buffer, MODEM_BUFFER);
       SimModemSerial.flush();
     }
-    if (lastPutSize){                                                 // Last cycle to write data less than maximum number of bytes
-      readWaitResponse(lastPutString,3000,"FTPPUT:");                 // 
+    if (lastPutSize){                                                   // Last cycle to write data less than maximum number of bytes
+      responseString = readWaitResponse(lastPutString,3000,"FTPPUT:");  //
+      if (responseString.indexOf("2,") < 0){                            // If transmission failed break loop
+        Serial.println("Error");
+        return -1;
+      }
       for (int j = 0; j < lastPutSize; j++){
           temp = virtualFile[j+numPuts*MODEM_BUFFER];
           SimModemSerial.print(temp);

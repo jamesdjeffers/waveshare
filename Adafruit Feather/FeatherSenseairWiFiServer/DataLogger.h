@@ -28,8 +28,8 @@
 #define STATUS_DATA       "status.txt"
 #define STATUS_TAG_FILE   "lastFileIndex="
 #define STATUS_TAG_TEST   "lastTestIndex="
-#define FILE_MAX_SIZE     2448000 
-#define DATA_MAX_SIZE     2448000
+#define FILE_MAX_SIZE     32000 
+#define DATA_MAX_SIZE     32000
 
 #define LOG_FILE_NAME     "L"
 #define DATA_FILE_NAME    "D"
