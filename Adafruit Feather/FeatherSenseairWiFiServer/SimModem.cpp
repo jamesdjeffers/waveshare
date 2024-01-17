@@ -484,6 +484,38 @@ String SimModem::readIMEI(){
  * Date occurs before comma ","
  * Date format is YY/MM/DD
  */
+int SimModem::readClock(int format, String &clockString){
+  if (status == MODEM_STATUS_ON){
+    String dateTimeResponse = readWaitResponse(AT_TIME,100,"CCLK:");
+  
+    int startIndex = dateTimeResponse.indexOf("\"");
+    int endIndex = dateTimeResponse.indexOf("\"",startIndex+1);
+    if (format == 0){
+      dateTimeResponse.substring(startIndex+1, dateTimeResponse.indexOf("-",startIndex));
+    }
+    else if (format == 1){
+      dateTimeResponse = dateTimeResponse.substring(startIndex+1, dateTimeResponse.indexOf(",",startIndex));
+      dateTimeResponse.replace("/","");
+    }
+    else {
+      dateTimeResponse = dateTimeResponse.substring(startIndex+1, dateTimeResponse.indexOf("-",startIndex));
+      dateTimeResponse.replace("/","");
+      dateTimeResponse.replace(",","_");
+      dateTimeResponse.replace(":","");
+    }
+    clockString = dateTimeResponse;
+    return 0;
+  }
+  else{
+    return -1;
+  }
+}
+
+/*
+ * Time string is in quotes if available
+ * Date occurs before comma ","
+ * Date format is YY/MM/DD
+ */
 String SimModem::readClock(int format){
   if (status == MODEM_STATUS_ON){
     String dateTimeResponse = readWaitResponse(AT_TIME,100,"CCLK:");
@@ -672,7 +704,9 @@ int SimModem::ftpPut(File dataFile, int option){
   int lastPutSize = dataSize % MODEM_BUFFER;
   String lastPutString = AT_FTP_PWR + String(lastPutSize);
 
-  String putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + readClock(2) + "_" + dataFile.name() + String("\"");
+  String timeString;
+  readClock(2, timeString);
+  String putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + timeString + "_" + dataFile.name() + String("\"");
   readWaitResponse(putFileName,3000,"OK");
   readResponse(AT_FTP_PUT_QNM,100);                                     // ERROR: Delay needed? or verifies set name
 
@@ -737,12 +771,14 @@ int SimModem::ftpPut(String virtualFile, int option){
   int lastPutSize = dataSize % MODEM_BUFFER;
   String lastPutString = AT_FTP_PWR + String(lastPutSize);
 
+  String timeString;
+  readClock(2, timeString);
   String putFileName;
   if (option == 2){
-    putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + readClock(2) + ".txt" + String("\"");
+    putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + timeString + ".txt" + String("\"");
   }
   else{
-    putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + readClock(2) + ".csv" + String("\"");
+    putFileName = AT_FTP_PUT_NM1 + String("\"") + imei + timeString + ".csv" + String("\"");
   }
   readWaitResponse(putFileName,3000,"OK");
   readResponse(AT_FTP_PUT_QNM,100);                                     // ERROR: Delay needed? or verifies set name

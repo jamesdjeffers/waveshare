@@ -18,14 +18,14 @@
 */
 #include "k96Modbus.h"
 
-#if BOARD == 0
+#if PCB_VERSION == 0
   Uart sensorSerial (&sercom1, K96_TX, K96_RX, SERCOM_RX_PAD_0, UART_TX_PAD_2);
   void SERCOM1_Handler(){
     sensorSerial.IrqHandler();
   }
-#elif BOARD == 1
+#elif PCB_VERSION == 1
   #define sensorSerial Serial1
-#elif BOARD == 2
+#elif PCB_VERSION == 2
   #define sensorSerial Serial1
 #endif
 

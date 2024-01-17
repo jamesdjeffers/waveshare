@@ -34,7 +34,7 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#define SW_VER_NUM          "Firmware v0.10.2"
+#define SW_VER_NUM          "Firmware v0.10.3"
 #include "secrets.h"
 
 #include "SystemControl.h"
@@ -81,7 +81,7 @@ int countLastDataFile = 0;
 int intervalCfg = 0;                      // Read timing configuration by FTP every 3 minutes
 int timerLastCfg = 0;
 
-int intervalBackup = 180000;                   // Backup the data file every 15 minutes
+int intervalBackup = 0;                   // Backup the data file every 15 minutes
 int LastFileUpload = 0;
 int lastFTPByteBackup = 0;
 
@@ -174,7 +174,8 @@ void setup() {
       Serial.println(" not present");
     }
     else{
-      logger.fileAddCSV((modem.readClock(0)+": Modem IMEI " + modem.readIMEI()),FILE_TYPE_LOG);
+      modem.readClock(0, returnString);
+      logger.fileAddCSV((returnString +": Modem IMEI " + modem.readIMEI()),FILE_TYPE_LOG);
       Serial.println(" initialized");
     }
   }
@@ -183,10 +184,11 @@ void setup() {
   statusSensor = k96.init();
   if (!statusSensor){
     Serial.println("Sensor initialized");
-    logger.fileAddCSV((modem.readClock(0)+": K96 Sensor Initialized"),FILE_TYPE_LOG);
+    modem.readClock(0, returnString);
+    logger.fileAddCSV((returnString +": K96 Sensor Initialized"),FILE_TYPE_LOG);
   }
   else {
-    logger.fileAddCSV((modem.readClock(0) + ": K96 Sensor Failed"),FILE_TYPE_LOG);
+    logger.fileAddCSV((returnString + ": K96 Sensor Failed"),FILE_TYPE_LOG);
     Serial.println("Sensor failed");
   }
 
@@ -205,7 +207,8 @@ void setup() {
   // Create a data acquisition file based on the date
   if (statusSD >= 0){
     logger.fileNewName();
-    logger.fileAddCSV((modem.readClock(0)+": Data acquisition file = " + logger.fileNameString()),FILE_TYPE_LOG);
+    modem.readClock(0, returnString);
+    logger.fileAddCSV((returnString+": Data acquisition file = " + logger.fileNameString()),FILE_TYPE_LOG);
   }
   
   // Completed startup, if internet connection available store system log
@@ -214,25 +217,26 @@ void setup() {
     if (statusSD == FILE_REAL){
       File tempFile = logger.fileOpen(FILE_TYPE_LOG);
       int currentFTP = modem.ftpPut(tempFile,FILE_TYPE_LOG);
-      logger.fileAddCSV((modem.readClock(0)+": Log File Uploaded Bytes: " + String(tempFile.size())),FILE_TYPE_LOG);
+      modem.readClock(0, returnString);
+      logger.fileAddCSV((returnString +": Log File Uploaded Bytes: " + String(tempFile.size())),FILE_TYPE_LOG);
       if (!currentFTP){
-        logger.fileAddCSV((modem.readClock(0)+": Log File Uploaded Bytes: " + String(tempFile.size())),FILE_TYPE_LOG);
+        logger.fileAddCSV((returnString +": Log File Uploaded Bytes: " + String(tempFile.size())),FILE_TYPE_LOG);
         lastFTPByteLog = tempFile.size();
       }
       else{
-        logger.fileAddCSV((modem.readClock(0)+": Log File Upload Failed Code: " + String(currentFTP)),FILE_TYPE_LOG);
+        logger.fileAddCSV((returnString+": Log File Upload Failed Code: " + String(currentFTP)),FILE_TYPE_LOG);
       }
       tempFile.close();
     }
     else if (statusSD == FILE_VIRTUAL){
       int currentFTP = modem.ftpPut(logger.fileRead(FILE_TYPE_LOG),FILE_TYPE_LOG);
-      
+      modem.readClock(0, returnString);
       if (!currentFTP){
-        logger.fileAddCSV((modem.readClock(0)+": Log File Upload (Bytes) = " + String(logger.fileSize(FILE_TYPE_LOG))),FILE_TYPE_LOG);
+        logger.fileAddCSV((returnString +": Log File Upload (Bytes) = " + String(logger.fileSize(FILE_TYPE_LOG))),FILE_TYPE_LOG);
         lastFTPByteLog = logger.fileSize(FILE_TYPE_LOG);
       }
       else{
-        logger.fileAddCSV((modem.readClock(0)+": Log File Upload Failed (Code) = " + String(currentFTP)),FILE_TYPE_LOG);
+        logger.fileAddCSV((returnString +": Log File Upload Failed (Code) = " + String(currentFTP)),FILE_TYPE_LOG);
       }
     }
   }
@@ -379,7 +383,7 @@ void loop() {
       intervalUpdate = serialCommand.substring(7,serialDataSize).toInt();
       Serial.print("New FTP upload rate: ");
       Serial.println(intervalUpdate);
-      logger.fileAddCSV((modem.readClock(0)+": FTP Upload Delay = " + String(intervalUpdate)),2);
+      logger.fileAddCSV((returnString +": FTP Upload Delay = " + String(intervalUpdate)),2);
     }
     
     else if (serialCommand == "e"){
@@ -405,7 +409,8 @@ void loop() {
     }
     else if (serialCommand == "clock"){
       Serial.print("Simcom 7070G Date and Time = ");
-      Serial.println(modem.readClock(0));
+      modem.readClock(0, returnString);
+      Serial.println(returnString);
     }
     else if (serialCommand == "clock reset"){
       Serial.print("Simcom 7070G Date and Time = ");
@@ -711,7 +716,8 @@ void loop() {
       dataString += gpsSerial.readResponse();
     }
     if (statusModem == DEVICE_ENABLED && logModemTime){
-      dataString.concat(modem.readClock(0));
+      modem.readClock(0, returnString);
+      dataString.concat(returnString);
     }
     if (statusModem == DEVICE_ENABLED && logModemPower){
       dataString += "," + modem.readSignal();

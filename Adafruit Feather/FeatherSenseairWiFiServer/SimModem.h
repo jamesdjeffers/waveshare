@@ -149,15 +149,15 @@
 #define AT_MQT_URL_MOSQ     "AT+SMCONF=\"URL\",test.mosquitto.org,6000"
 #define AT_MQT_TIM          "AT+SMCONF=\"KEEPTIME\",60"
 #define AT_MQT_CSS          "AT+SMCONF=\"CLEANSS\",1"
-#define AT_MQT_CLI          "AT+SMCONF=\"CLIENTID\",\"dev0\""
-#define AT_MQT_TOP          "AT+SMCONF=\"TOPIC\",aimnet"
+#define AT_MQT_CLI          "AT+SMCONF=\"CLIENTID\",\"aimnet002\""
+#define AT_MQT_TOP          "AT+SMCONF=\"TOPIC\",\"aimnet/002\""
 #define AT_MQT_CON          "AT+SMCONN"
-#define AT_MQT_SUB          "AT+SMSUB=\"aimnet\",1"
-#define AT_MQT_PUB5         "AT+SMPUB=\"aimnet\",5,1,1"
-#define AT_MQT_PUB1         "AT+SMPUB=\"aimnet\",1,1,1"
-#define AT_MQT_PUBX         "AT+SMPUB=\"aimnet\","
+#define AT_MQT_SUB          "AT+SMSUB=\"aimnet/002\",1"
+#define AT_MQT_PUB5         "AT+SMPUB=\"aimnet/002\",5,1,1"
+#define AT_MQT_PUB1         "AT+SMPUB=\"aimnet/002\",1,1,1"
+#define AT_MQT_PUBX         "AT+SMPUB=\"aimnet/002\","
 #define AT_MQT_PUBY         ",1,1"
-#define AT_MQT_UNS        "AT+SMUNSUB=\"aimnet\""
+#define AT_MQT_UNS        "AT+SMUNSUB=\"aimnet/002\""
 #define AT_MQT_DIS        "AT+SMDISC"
 #define AT_MQT_STA        "AT+SMSTATE?"
 #define AT_MQT_CFG        "AT+SMCONF?"
@@ -235,6 +235,7 @@ public:
   String readRFCfg();
   
   String readClock(int format);
+  int readClock(int format, String &clockString);
   String readClockID();
   
   int readIP(String &ipAddress);
