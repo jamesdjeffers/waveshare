@@ -625,6 +625,11 @@ void loop() {
       modem.startMQTT(2);
       modem.mqttStatus();
     }
+    else if (serialCommand == "mqtt start 3"){
+      Serial.print("Simcom 7070G MQTT Start = ");
+      modem.startMQTT(3);
+      modem.mqttStatus();
+    }
     else if (serialCommand == "mqtt status"){
       Serial.print("Simcom 7070G MQTT Status = ");
       modem.mqttStatus();
@@ -689,6 +694,12 @@ void loop() {
       Serial.print("GPS Serial Time = ");
       Serial.println(gpsSerial.time());
     }
+    //********************************************************************************
+    // SMS Commands
+    else if (serialCommand == "sms read"){
+      Serial.println("Simcom 7070G SMS Read ");
+      Serial.println(modem.smsRead());
+    }
     else {
       Serial.print("Unknown Command: ");
       Serial.println(serialCommand);
@@ -752,7 +763,7 @@ void loop() {
     
     // MQTT
     //returnValue = modem.mqttRead(returnString, 1);
-    returnValue = modem.mqttWrite(dataString, 1);
+    //returnValue = modem.mqttWrite(dataString, 1);
 
     //FTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTPFTP
     // Update the data file on the FTP server

@@ -118,13 +118,13 @@
 #define AT_FTP_PW_QRY   "AT+FTPPW?"
 
 #define AT_FTP_GET_NAM  "AT+FTPGETNAME=\"config.json\""
-#define AT_FTP_GET_PTH  "AT+FTPGETPATH=\"/incoming/binbin\""
+#define AT_FTP_GET_PTH  "AT+FTPGETPATH=\"/msense\""
 
 #define AT_FTP_GET_QNM  "AT+FTPGETNAME?"
 #define AT_FTP_GET_QPT  "AT+FTPGETPATH?"
 
-#define AT_FTP_PUT_NM1  "AT+FTPPUTNAME="
-#define AT_FTP_PUT_PTH  "AT+FTPPUTPATH=\"/incoming/binbin/\""
+#define AT_FTP_PUT_NM1  "AT+FTPPUTNAME=\"test\""
+#define AT_FTP_PUT_PTH  "AT+FTPPUTPATH=\"/msense\""
 #define AT_FTP_PUT_NEW  "AT+FTPPUTOPT=\"STOR\""
 #define AT_FTP_PUT_APP  "AT+FTPPUTOPT=\"APPE\""
 
@@ -147,17 +147,18 @@
 
 #define AT_MQT_URL          "AT+SMCONF=\"URL\",b97b659315cf4f0cafd48b90e3421aa6.s2.eu.hivemq.cloud,6000"
 #define AT_MQT_URL_MOSQ     "AT+SMCONF=\"URL\",test.mosquitto.org,6000"
+#define AT_MQT_URL_GUST     "AT+SMCONF=\"URL\",gust.caps.ou.edu,6000"
 #define AT_MQT_TIM          "AT+SMCONF=\"KEEPTIME\",60"
 #define AT_MQT_CSS          "AT+SMCONF=\"CLEANSS\",1"
-#define AT_MQT_CLI          "AT+SMCONF=\"CLIENTID\",\"aimnet002\""
-#define AT_MQT_TOP          "AT+SMCONF=\"TOPIC\",\"aimnet/002\""
+#define AT_MQT_CLI          "AT+SMCONF=\"CLIENTID\",\"aimnet005\""
+#define AT_MQT_TOP          "AT+SMCONF=\"TOPIC\",\"aimnet/005\""
 #define AT_MQT_CON          "AT+SMCONN"
-#define AT_MQT_SUB          "AT+SMSUB=\"aimnet/002\",1"
-#define AT_MQT_PUB5         "AT+SMPUB=\"aimnet/002\",5,1,1"
-#define AT_MQT_PUB1         "AT+SMPUB=\"aimnet/002\",1,1,1"
-#define AT_MQT_PUBX         "AT+SMPUB=\"aimnet/002\","
+#define AT_MQT_SUB          "AT+SMSUB=\"aimnet/005\",1"
+#define AT_MQT_PUB5         "AT+SMPUB=\"aimnet/005\",5,1,1"
+#define AT_MQT_PUB1         "AT+SMPUB=\"aimnet/005\",1,1,1"
+#define AT_MQT_PUBX         "AT+SMPUB=\"aimnet/005\","
 #define AT_MQT_PUBY         ",1,1"
-#define AT_MQT_UNS        "AT+SMUNSUB=\"aimnet/002\""
+#define AT_MQT_UNS        "AT+SMUNSUB=\"aimnet/005\""
 #define AT_MQT_DIS        "AT+SMDISC"
 #define AT_MQT_STA        "AT+SMSTATE?"
 #define AT_MQT_CFG        "AT+SMCONF?"
@@ -166,21 +167,29 @@
 #define AT_SSL_CIP        "AT+CSSLCFG=\"ciphersuite\",1,0,\"0xc02f\""
 #define AT_SSL_SNI_HIVE   "AT+CSSLCFG=\"sni\",1,b97b659315cf4f0cafd48b90e3421aa6.s2.eu.hivemq.cloud"
 #define AT_SSL_SNI_MOSQ   "AT+CSSLCFG=\"sni\",1,mosquitto.org.crt"
+#define AT_SSL_SNI_GUST   "AT+CSSLCFG=\"sni\",1,gust.caps.ou.edu"
 #define AT_SSL_CTX        "AT+CSSLCFG=\"ctxindex\",1"
 
 #define AT_SSL_CV1        "AT+CSSLCFG=\"convert\",1,\"myclient.crt\",\"myclient.key\""
 #define AT_SSL_CV2        "AT+CSSLCFG=\"convert\",2,\"ca.crt\""
 #define AT_SSL_CV3        "AT+CSSLCFG=\"convert\",1,\"ca.crt\""
 
-#define AT_SSL_FL1          "AT+CFSWFILE=3,\"ca.crt\",0,1939,5000"
-#define AT_SSL_CA_GOOG      "AT+CFSWFILE=3,\"ca.crt\",0,5072,5000"
-#define AT_SSL_CA_HIVE      "AT+CFSWFILE=3,\"ca.crt\",0,2388,5000"
-#define AT_SSL_CA_MOSQ      "AT+CFSWFILE=3,\"ca.crt\",0,1452,5000"
-#define AT_SSL_FL2          "AT+CFSWFILE=3,\"myclient.crt\",0,899,5000"
-#define AT_SSL_FL3          "AT+CFSWFILE=3,\"myclient.key\",0,887,5000"
+#define AT_SSL_FL1          "AT+CFSWFILE=3,\"ca.crt\",0,1939,9000"
+#define AT_SSL_CA_GOOG      "AT+CFSWFILE=3,\"ca.crt\",0,5072,9000"
+#define AT_SSL_CA_HIVE      "AT+CFSWFILE=3,\"ca.crt\",0,2388,9000"
+#define AT_SSL_CA_MOSQ      "AT+CFSWFILE=3,\"ca.crt\",0,1452,9000"
+#define AT_SSL_FL2          "AT+CFSWFILE=3,\"myclient.crt\",0,899,9000"
+#define AT_SSL_FL3          "AT+CFSWFILE=3,\"myclient.key\",0,887,9000"
 
 #define AT_CFS_INI  "AT+CFSINIT"
 #define AT_CFS_TRM  "AT+CFSTERM"
+
+#define AT_SMS_REG        "AT+CREG?"
+#define AT_SMS_CSCA       "AT+CSCA?"
+#define AT_SMS_CSMS       "AT+CSMS?"
+#define AT_SMS_CMGF       "AT+CMGF=1"
+#define AT_SMS_CSAS       "AT+CSAS"
+#define AT_SMS_CMGL       "AT+CMGL=\"ALL\""
 
 #include "secrets.h"
 #include <Arduino.h>        // required before wiring_private.h
@@ -286,6 +295,8 @@ public:
 
   int httpRead();
   int httpSSL();
+
+  int smsRead();
 
   String RFOn();
   String RFOff();

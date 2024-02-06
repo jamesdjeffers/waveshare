@@ -193,7 +193,7 @@ String SimModem::readBurst(String command, int waitTime, String back){
 void SimModem:: powerToggle(){
   int pulses = 1;
   String responseString = readResponse(ATE_OFF,0);
-  if (responseString.length() > 0) pulses = 2;      // Device is on and communicating, turn off then on
+  if (responseString.indexOf("OK") >= 0) pulses = 2;      // Device is on and communicating, turn off then on
 
   for (int i=0; i<pulses; i++){
     digitalWrite(MODEM_POWER, MODEM_PWR_OFF);       // Value should be low already    
@@ -214,14 +214,14 @@ void SimModem:: powerToggle(){
  *  Use the ATE_OFF string to enforce interface conditions
  */
 int SimModem::powerOn(){
-  String responseString;
+  String responseString = "";
   if (status >= -1){
     // Check if device is on by disabling echo mode
     SimModemSerial.flush();
     responseString = readResponse(ATE_OFF,0);
     responseString = readResponse(ATE_OFF,0);
     responseString = readResponse(ATE_OFF,0);
-    if(responseString != ""){
+    if(responseString == "OK"){
       return 0;
     }
   }
@@ -229,7 +229,7 @@ int SimModem::powerOn(){
   // Device is not in reset, toggle IO pin and start timer
   else{
     responseString = readResponse(ATE_OFF,0);
-    if(responseString != ""){
+    if(responseString == "OK"){
       return 0;
     }
     powerToggle();
@@ -341,8 +341,8 @@ int SimModem::startFTP(){
   delay(MODEM_CMD_DELAY);
   responseString = readResponse(AT_FTP_UN,100);       // Set the username (do not leave blank, can be "anonymous")
   delay(MODEM_CMD_DELAY);
-  //responseString = readResponse(AT_FTP_PWD,100);      // Password will default to empty string
-  //delay(MODEM_CMD_DELAY);
+  responseString = readResponse(AT_FTP_PWD,100);      // Password will default to empty string
+  delay(MODEM_CMD_DELAY);
   responseString = readResponse(AT_FTP_PRT,100);      // Choose the FTP port (default = 21)
   delay(MODEM_CMD_DELAY);
   responseString = readResponse(AT_FTP_PUT_NEW,100);  // Choose the FTP file mode (default = APPEND)
@@ -385,12 +385,23 @@ int SimModem::startMQTT(int option){
     readResponse(AT_MQT_CSS,0);
     readResponse(AT_MQT_TOP,0);
   }
+  // Option 2 is anonymous, with encryption test
   else if (option == 2){
     readResponse(MQTT_SERVER_TEST_SSL,0);
     readResponse(MQTT_UN_ANON,0);
     readResponse(MQTT_PWD_ANON,0);
     readResponse(MQTT_ID,0);
     readResponse(AT_SSL_SNI_MOSQ,0);
+    readResponse(AT_MQT_TIM,0);
+    readResponse(AT_MQT_CSS,0);
+    readResponse(AT_MQT_TOP,0);
+  }
+  else if (option == 3){
+    readResponse(MQTT_SERVER_GUST,0);
+    readResponse(MQTT_UN_GUST,0);
+    readResponse(MQTT_PWD_GUST,0);
+    readResponse(MQTT_ID,0);
+    readResponse(AT_SSL_SNI_GUST,0);
     readResponse(AT_MQT_TIM,0);
     readResponse(AT_MQT_CSS,0);
     readResponse(AT_MQT_TOP,0);
@@ -411,6 +422,7 @@ int SimModem::startMQTT(int option){
  *****************************************************************************/
 int SimModem::mqttConnect(){
   String response = readResponse(AT_MQT_CON,1000);
+  Serial.println(response);
   if (response.indexOf("OK") >= 0){
     statusMQTT = MODEM_STATUS_MQTT_CON;
     return 0;
@@ -480,18 +492,18 @@ String SimModem::readIMEI(){
 }
 
 /*
- * Time string is in quotes if available
+ * Time string is in quotes if available "YY/MM/DD,HH:MM:SS-XX"
  * Date occurs before comma ","
  * Date format is YY/MM/DD
+ * Final code is offset from GMT
  */
 int SimModem::readClock(int format, String &clockString){
   if (status == MODEM_STATUS_ON){
     String dateTimeResponse = readWaitResponse(AT_TIME,100,"CCLK:");
   
-    int startIndex = dateTimeResponse.indexOf("\"");
-    int endIndex = dateTimeResponse.indexOf("\"",startIndex+1);
-    if (format == 0){
-      dateTimeResponse.substring(startIndex+1, dateTimeResponse.indexOf("-",startIndex));
+    int startIndex = dateTimeResponse.indexOf("\"");                                  // Find index of first quotation mark (might not be at start of line)
+    if (format == 0){                                                                 // Remove quotation marks and the GMT offset
+      dateTimeResponse = dateTimeResponse.substring(startIndex+1, dateTimeResponse.indexOf("-",startIndex));
     }
     else if (format == 1){
       dateTimeResponse = dateTimeResponse.substring(startIndex+1, dateTimeResponse.indexOf(",",startIndex));
@@ -654,6 +666,10 @@ String SimModem::ftpList(){
         responseString = readWaitResponse(AT_FTP_LRD,10000,"FTPLIST: 2,");
       }
       Serial.print(readBurst(AT_FTP_LRD,30000,"FTPLIST:"));
+    }
+    else{
+      Serial.println("FTP directory list failed");
+      Serial.println(responseString);
     }
     Serial.println("Waiting for disconnect, FTP");
     readWaitResponse(AT_FTP_EXT,3000,"FTPLIST: 1,80");
@@ -1352,5 +1368,15 @@ int SimModem::startCFS(){
 
 int SimModem::stopCFS(){
   Serial.println(readResponse(AT_CFS_TRM,0));
+  return 0;
+}
+
+int SimModem::smsRead(){
+  Serial.println(readResponse(AT_SMS_REG,0));
+  Serial.println(readResponse(AT_SMS_CSCA,0));
+  Serial.println(readResponse(AT_SMS_CSMS,0));
+  Serial.println(readResponse(AT_SMS_CMGF,0));
+  Serial.println(readResponse(AT_SMS_CSAS,0));
+  Serial.println(readResponse(AT_SMS_CMGL,0));
   return 0;
 }
