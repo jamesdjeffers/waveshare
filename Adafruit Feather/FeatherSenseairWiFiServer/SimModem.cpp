@@ -49,6 +49,7 @@ int SimModem::init()
   pinPeripheral(modemTX, PIO_SERCOM);         // Assign TX function
   pinMode(MODEM_POWER,OUTPUT);                // Control pin for power on, off, and reset
   digitalWrite(MODEM_POWER, MODEM_PWR_OFF);   // Set to "off" value (default != "off" for all devices)
+  Serial.println(status);
     
   powerOn();                                  // Need to check for device on, off, not present
   
@@ -215,25 +216,31 @@ void SimModem:: powerToggle(){
  */
 int SimModem::powerOn(){
   String responseString = "";
-  if (status >= -1){
+  
+  if (status == MODEM_STATUS_UNKNOWN){              // Device status unknown (should only occur on startup)
+    responseString = readResponse(ATE_ON,0);        // Enable echo mode: if first time no effect, from restart verifies next command
+    responseString = readResponse(ATE_OFF,0);       // Disable echo mode: reply should be multiple lines with Line 1 = "ATE" and Line 2 = "OK"
+    if (responseString.indexOf("ATE0") == 0 && 
+        responseString.indexOf("OK") >= 0){
+      return 0;                                     // Received expected response
+    }
+    powerToggle();                                  // Didn't receive expected response, toggle power control signal
+  }
+  
+  else if (status >= -1){
     // Check if device is on by disabling echo mode
+    Serial.println("Status >= 1");
     SimModemSerial.flush();
-    responseString = readResponse(ATE_OFF,0);
-    responseString = readResponse(ATE_OFF,0);
-    responseString = readResponse(ATE_OFF,0);
-    if(responseString == "OK"){
+    responseString = readResponse(ATE_OFF,1);
+    responseString = readResponse(ATE_OFF,1);
+    responseString = readResponse(ATE_OFF,1);
+    Serial.println(responseString);
+    if(responseString.indexOf("OK") >= 0){
       return 0;
     }
   }
   
-  // Device is not in reset, toggle IO pin and start timer
-  else{
-    responseString = readResponse(ATE_OFF,0);
-    if(responseString == "OK"){
-      return 0;
-    }
-    powerToggle();
-  }
+  
   return 0;   // Operation occured normally
 }
 
@@ -283,7 +290,7 @@ int SimModem::startSession(){
     if (returnValue > 0){
       return 1;
     }
-    returnValue = startMQTT(1);
+    returnValue = startMQTT(3);
     if (returnValue > 0){
       return 1;
     }
@@ -404,7 +411,8 @@ int SimModem::startMQTT(int option){
     readResponse(AT_SSL_SNI_GUST,0);
     readResponse(AT_MQT_TIM,0);
     readResponse(AT_MQT_CSS,0);
-    readResponse(AT_MQT_TOP,0);
+    readResponse(AT_MQT_TOP,0);    
+    readResponse(AT_MQT_RET,0);
   }
   statusMQTT = MODEM_STATUS_MQTT_CFG;
   return 0;
@@ -987,6 +995,7 @@ String SimModem::ftpFile(){
  *          2 - error, message empty
  *****************************************************************************/
 int SimModem::mqttSub(String &message){
+  
   message = readWaitResponse(AT_MQT_SUB,5000,"SMSUB:");
   if (message.indexOf("ERROR") < 0){
     statusMQTT = MODEM_STATUS_MQTT_SUB;
@@ -1008,7 +1017,8 @@ int SimModem::mqttPub(String message, int option){
   }
   else if (option == 1){
     String ATpubMessage = AT_MQT_PUBX + String(message.length()) + AT_MQT_PUBY;
-    readResponse(ATpubMessage,0);
+    Serial.println(ATpubMessage);
+    Serial.println(readResponse(ATpubMessage,0));
     for (int i = 0; i < message.length(); i++){
       temp = message[i];
       SimModemSerial.print(temp);
@@ -1024,6 +1034,7 @@ int SimModem::mqttPub(String message, int option){
 int SimModem::mqttUnsub(){
   String response = readResponse(AT_MQT_UNS,0);
   if (response.indexOf("OK")){
+    statusMQTT = MODEM_STATUS_MQTT_CON;
     return 0;
   }
   return -1;
@@ -1043,19 +1054,13 @@ int SimModem::mqttUnsub(){
 int SimModem::mqttRead(String &message, int option){
   String response;
   if (statusMQTT == MODEM_STATUS_MQTT_UNKNOWN){
-    Serial.println("unknown");
     response = readWaitResponse(AT_MQT_STA,1000,"SMSTATE:");  // Check the connection
     if (response.indexOf("1") >= 0){                          // 1 = connected
       statusMQTT = MODEM_STATUS_MQTT_CON;                     // Set status
     }
-    // Device is not connected MQTT server
-    else{
-      Serial.println("not connect");
-      // Attempt to write configuration
-      if (startMQTT(option)){
-        Serial.println("fail start");
-        // Configuration failed, error returned
-        statusMQTT = MODEM_STATUS_MQTT_UNKNOWN;
+    else{                                                     // Device is not connected MQTT server
+      if (startMQTT(option)){                                 // Attempt to write configuration
+        statusMQTT = MODEM_STATUS_MQTT_UNKNOWN;               // Configuration failed, error returned
         return -1;
       }
     }
@@ -1071,12 +1076,10 @@ int SimModem::mqttRead(String &message, int option){
     mqttUnsub();
   }
   // Need to change to configuration topic
-  readResponse(AT_MQT_TOP,0);
-  delay(100);
+  readResponse(AT_MQT_TOP_CFG,0);
   // Final step is to subscribe and read latest message
   mqttSub(message);
-  Serial.println(message);
-  //mqttUnsub();
+  mqttUnsub();
   return 0;
 }
 
@@ -1094,19 +1097,14 @@ int SimModem::mqttRead(String &message, int option){
 int SimModem::mqttWrite(String &message, int option){
   String response;
   if (statusMQTT == MODEM_STATUS_MQTT_UNKNOWN){
-    Serial.println("unknown");
     response = readWaitResponse(AT_MQT_STA,1000,"SMSTATE:");  // Check the connection
     if (response.indexOf("1") >= 0){                          // 1 = connected
       statusMQTT = MODEM_STATUS_MQTT_CON;                     // Set status
     }
-    // Device is not connected MQTT server
-    else{
-      Serial.println("not connect");
-      // Attempt to write configuration
-      if (startMQTT(option)){
-        Serial.println("fail start");
-        // Configuration failed, error returned
-        statusMQTT = MODEM_STATUS_MQTT_UNKNOWN;
+    
+    else{                                                     // Device is not connected MQTT server      
+      if (startMQTT(option)){                                 // Attempt to write configuration
+        statusMQTT = MODEM_STATUS_MQTT_UNKNOWN;               // Configuration failed, error returned
         return -1;
       }
     }

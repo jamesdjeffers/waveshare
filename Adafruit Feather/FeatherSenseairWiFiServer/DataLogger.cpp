@@ -451,3 +451,35 @@ int DataLogger::fileSize(int option){
   return size;
     
 }
+
+/*
+ * Returns the string from the virtual file associated with option
+ * 
+ * Input Option (type definitions)
+ */
+int DataLogger::fileErase(int option){
+  // open the file. note that only one file can be open at a time,
+  // so you have to close this one before opening another.
+  if (option == FILE_TYPE_BACKUP){
+    backupData = "";
+  }
+  else if (option == FILE_TYPE_LOG) {
+    backupLog = "";
+  }
+  else if (option == FILE_TYPE_STATUS) {
+    backupData  = "";
+  }
+  else if (option == FILE_TYPE_CRT) {
+    backupData = "";
+  }
+  else if (option == FILE_TYPE_PEM) {
+    backupData = "";
+  }
+  else if (option == FILE_TYPE_KEY) {
+    backupData = "";
+  }
+  else{
+    backupData = "";
+  }
+  return 0;
+}

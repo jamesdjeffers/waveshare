@@ -59,6 +59,7 @@
 
 #define ATI        "ATI"                            // Device info, query purposes
 #define ATE_OFF    "ATE0"                           // Turns off echo mode
+#define ATE_ON     "ATE1"                           // Turns on echo mode
 #define AT_CSQ     "AT+CSQ"                         // 4G-LTE signal strength
 #define AT_CPSI     "AT+CPSI?"
 #define AT_GSN     "AT+GSN"
@@ -150,15 +151,17 @@
 #define AT_MQT_URL_GUST     "AT+SMCONF=\"URL\",gust.caps.ou.edu,6000"
 #define AT_MQT_TIM          "AT+SMCONF=\"KEEPTIME\",60"
 #define AT_MQT_CSS          "AT+SMCONF=\"CLEANSS\",1"
-#define AT_MQT_CLI          "AT+SMCONF=\"CLIENTID\",\"aimnet005\""
-#define AT_MQT_TOP          "AT+SMCONF=\"TOPIC\",\"aimnet/005\""
+#define AT_MQT_CLI          "AT+SMCONF=\"CLIENTID\",\"aimnet008\""
+#define AT_MQT_TOP          "AT+SMCONF=\"TOPIC\",\"aimnet/008\""
+#define AT_MQT_TOP_CFG      "AT+SMCONF=\"TOPIC\",\"aimnet/status\""
+#define AT_MQT_RET          "AT+SMCONF=\"RETAIN\",1"
 #define AT_MQT_CON          "AT+SMCONN"
-#define AT_MQT_SUB          "AT+SMSUB=\"aimnet/005\",1"
-#define AT_MQT_PUB5         "AT+SMPUB=\"aimnet/005\",5,1,1"
-#define AT_MQT_PUB1         "AT+SMPUB=\"aimnet/005\",1,1,1"
-#define AT_MQT_PUBX         "AT+SMPUB=\"aimnet/005\","
+#define AT_MQT_SUB          "AT+SMSUB=\"aimnet/status\",1"
+#define AT_MQT_PUB5         "AT+SMPUB=\"aimnet/008\",5,1,1"
+#define AT_MQT_PUB1         "AT+SMPUB=\"aimnet/008\",1,1,1"
+#define AT_MQT_PUBX         "AT+SMPUB=\"aimnet/008\","
 #define AT_MQT_PUBY         ",1,1"
-#define AT_MQT_UNS        "AT+SMUNSUB=\"aimnet/005\""
+#define AT_MQT_UNS        "AT+SMUNSUB=\"aimnet/status\""
 #define AT_MQT_DIS        "AT+SMDISC"
 #define AT_MQT_STA        "AT+SMSTATE?"
 #define AT_MQT_CFG        "AT+SMCONF?"

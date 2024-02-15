@@ -28,8 +28,8 @@
 #define STATUS_DATA       "status.txt"
 #define STATUS_TAG_FILE   "lastFileIndex="
 #define STATUS_TAG_TEST   "lastTestIndex="
-#define FILE_MAX_SIZE     32000 
-#define DATA_MAX_SIZE     32000
+#define FILE_MAX_SIZE     64000 
+#define DATA_MAX_SIZE     64000
 
 #define LOG_FILE_NAME     "L"
 #define DATA_FILE_NAME    "D"
@@ -86,6 +86,7 @@ class DataLogger
 
     String fileRead(int option);
     int fileSize(int option);
+    int fileErase(int option);
   
 };
 
